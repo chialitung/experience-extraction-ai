@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Loader2, User, Bot, ArrowLeft, CheckCircle, BookOpen, AlertTriangle, Wrench, Lightbulb, ChevronDown, ChevronUp, Target, Shield, Sparkles, X, Mic, MicOff, Pause, Play, Volume2, Timer as TimerIcon, ArrowRight, StickyNote } from 'lucide-react';
+import { Send, Loader2, User, Bot, ArrowLeft, CheckCircle, BookOpen, AlertTriangle, Wrench, Lightbulb, ChevronDown, ChevronUp, Target, Shield, Sparkles, X, Mic, MicOff, Pause, Play, ArrowRight, StickyNote } from 'lucide-react';
 import { useInterview } from '@/hooks/useInterview';
 import { interviewApi } from '@/services/api';
 import { logger } from '@/utils/logger';
@@ -194,7 +194,7 @@ export function InterviewChatPage() {
         if (analysisRes?.data?.analysis) {
           loadLatestAnalysis(id);
         }
-      } catch (error) {
+      } catch {
         // 忽略错误
       }
     }, 5000);
@@ -248,7 +248,15 @@ export function InterviewChatPage() {
       setCurrentRound({ transcription: '', notes: [] });
     } catch (error: any) {
       logger.error('进入下一轮失败', { error: error?.message });
-      const msg = error?.response?.data?.detail || error?.message || '进入下一轮失败，请稍后重试';
+      const detail = error?.response?.data?.detail;
+      let msg: string;
+      if (Array.isArray(detail)) {
+        msg = detail.map((d: any) => d.msg || String(d)).join('; ');
+      } else if (typeof detail === 'string') {
+        msg = detail;
+      } else {
+        msg = error?.message || '进入下一轮失败，请稍后重试';
+      }
       setSendError(msg);
     } finally {
       setIsCompletingRound(false);

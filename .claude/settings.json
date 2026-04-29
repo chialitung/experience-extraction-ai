@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chcp 65001)",
+      "Bash(python -c ' *)",
+      "Bash(python -m pytest tests/test_content_analyzer_topic_drift.py -x)",
+      "Bash(python -m pytest)",
+      "Bash(del /f experience_extraction.db experience_extraction.db-journal)",
+      "Bash(rm -f experience_extraction.db experience_extraction.db-journal)",
+      "Bash(ls -la *.db)",
+      "Bash(dir /s /b test-results\\\\*.webm)",
+      "Bash(where ffmpeg *)",
+      "Bash(find /c /d -name \"ffmpeg.exe\")",
+      "Bash(\"/d/Program Files/EVCapture/ffmpeg.exe\" -y -i \"test-results/interview-voice-simulation-8ce82-模式全流程演示-完整访谈流程-with-语音输入并录屏-chromium/video.webm\" -c:v libx264 -preset fast -crf 23 -pix_fmt yuv420p -movflags +faststart \"test-results/e2e-demo.mp4\")",
+      "Bash(pip list *)",
+      "Bash(gt)",
+      "Bash(nul)",
+      "Bash(python -m uvicorn main:app --host 0.0.0.0 --port 8000)",
+      "Bash(python -c \"from app.api.v1.config import ConfigUpdateRequest; print\\('OK'\\)\")",
+      "Bash(python -c \"import app\")",
+      "Bash(uvicorn main:app --reload --host 0.0.0.0 --port 8000)",
+      "Bash(npx kill-port *)",
+      "Bash(python -c \"from app.services.interview_service import InterviewService; print\\('OK'\\)\")",
+      "Bash(python -c \"from app.services.interview_service import InterviewService; from app.services.llm_service import LLMService; print\\('Import OK'\\)\")",
+      "Bash(python -m pytest tests/test_interview_service_three_layer.py -x -q --timeout=60)",
+      "Bash(python -m pytest tests/test_interview_service_three_layer.py -x -q)",
+      "Bash(python -m pytest tests/test_interviews.py -x -q)",
+      "Bash(python -m pytest -x --tb=short)",
+      "Bash(python -m pytest tests/test_interview_service_topic_drift_integration.py -v --tb=short)",
+      "Bash(python -m pytest --tb=short)",
+      "Bash(taskkill /F /IM uvicorn.exe)",
+      "Bash(taskkill /F /IM node.exe)"
+    ],
+    "additionalDirectories": [
+      "D:\\经验萃取\\experience-extraction-ai\\backend"
+    ]
+  }
+}

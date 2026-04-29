@@ -2,6 +2,7 @@ import os
 import json
 from typing import Dict, Any, List, Optional
 from jinja2 import Environment, FileSystemLoader, Template
+from app.core.config import settings
 
 
 class PromptManager:
@@ -101,11 +102,14 @@ class PromptManager:
             off_topic = analysis.get("off_topic", False)
             off_conf = analysis.get("off_topic_confidence", 0)
             off_reason = analysis.get("off_topic_reason", "")
-            if off_topic or off_conf > 0.2:
+            if off_topic or off_conf > settings.TOPIC_DRIFT_PROMPT_INJECT:
                 base_prompt += f"- 偏离检测：{'⚠️ 疑似偏离' if off_topic else '未偏离'}（置信度{off_conf}）\n"
                 base_prompt += f"  分析：{off_reason}\n"
                 if off_topic:
                     base_prompt += "  【行动】请生成确认性问题，礼貌地将专家拉回当前步骤主题。\n"
+                    suggested_correction = analysis.get("suggested_correction")
+                    if suggested_correction:
+                        base_prompt += f"  【建议引导话术】{suggested_correction}\n"
 
             # 信息缺口
             gaps = analysis.get("gaps", [])

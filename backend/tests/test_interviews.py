@@ -22,7 +22,14 @@ TestingSessionLocal = async_sessionmaker(
 
 async def override_get_db():
     async with TestingSessionLocal() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
 
 app.dependency_overrides[get_db] = override_get_db
@@ -53,38 +60,40 @@ class TestInterviews:
             "background": "销售团队新员工培训",
             "expert_role": "资深销售经理",
             "expected_duration": 30,
-            "target_output_format": "script_card"
+            "target_output_format": ["script_card"]
         })
         assert response.status_code == 201
         data = response.json()
         assert data["theme"] == "新任销售代表的异议处理技巧"
         assert "id" in data
-    
+
     def test_list_interviews(self, setup_database):
         # 先创建一个
         client.post("/api/v1/interviews", json={
-            "theme": "测试主题",
+            "theme": "这是一个测试主题",
             "expected_duration": 30,
+            "target_output_format": ["script_card"]
         })
-        
+
         response = client.get("/api/v1/interviews")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] >= 1
         assert len(data["items"]) >= 1
-    
+
     def test_get_interview(self, setup_database):
         # 创建
         create_resp = client.post("/api/v1/interviews", json={
-            "theme": "测试主题",
+            "theme": "这是一个测试主题",
             "expected_duration": 30,
+            "target_output_format": ["script_card"]
         })
         interview_id = create_resp.json()["id"]
-        
+
         # 获取
         response = client.get(f"/api/v1/interviews/{interview_id}")
         assert response.status_code == 200
-        assert response.json()["theme"] == "测试主题"
+        assert response.json()["theme"] == "这是一个测试主题"
     
     def test_get_interview_not_found(self, setup_database):
         response = client.get("/api/v1/interviews/12345678-1234-1234-1234-123456789abc")

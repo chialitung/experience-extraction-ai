@@ -30,6 +30,20 @@ async def get_interview_service(db: AsyncSession = Depends(get_db)) -> Interview
     return InterviewService(db)
 
 
+def resolve_user_filter(current_user: Optional[User]) -> Optional[str]:
+    """解析访谈查询的用户过滤条件。
+
+    - 未登录（演示模式）：返回 None，不过滤（开放访问）
+    - 管理员：返回 None，不过滤（可看全部）
+    - 普通用户：返回 user_id，只看自己的
+    """
+    if current_user is None:
+        return None
+    if current_user.is_superuser:
+        return None
+    return str(current_user.id)
+
+
 # ==================== Interview CRUD ====================
 
 @router.post("", response_model=InterviewResponse, status_code=status.HTTP_201_CREATED)
@@ -54,7 +68,7 @@ async def list_interviews(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取访谈列表（登录用户只看自己的，未登录看全部）。支持状态过滤和主题搜索。"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interviews, total = await service.list_interviews(
         skip=skip, limit=limit, user_id=user_id, status=status_filter, search=search
     )
@@ -80,7 +94,7 @@ async def get_interview(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取访谈详情"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -95,7 +109,7 @@ async def update_interview(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """更新访谈"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -110,7 +124,7 @@ async def delete_interview(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """删除访谈（包括进行中的访谈，级联删除消息和结构化内容）"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -129,7 +143,7 @@ async def generate_blueprint(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """生成访谈蓝图"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -146,7 +160,7 @@ async def confirm_blueprint(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """确认蓝图"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -170,7 +184,7 @@ async def start_interview(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """启动访谈，自动生成开场问题"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -201,7 +215,7 @@ async def send_message(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """发送消息并获取AI回复（非流式）"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -241,7 +255,7 @@ async def get_messages(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取消息历史"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -263,7 +277,7 @@ async def send_message_stream(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """发送消息并获取AI流式回复"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -288,7 +302,7 @@ async def get_structured_content(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取实时结构化萃取内容"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -306,7 +320,7 @@ async def complete_interview(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """完成访谈，生成最终成果"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -323,7 +337,7 @@ async def get_output(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取成果"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -348,7 +362,7 @@ async def get_expert_profile(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取专家画像（沟通风格分析结果）"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -370,7 +384,7 @@ async def get_latest_analysis(
     """获取最新内容分析结果（回答颗粒度、偏离检测、信息缺口）"""
     from sqlalchemy import desc
     
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -406,7 +420,7 @@ async def mark_risks(
     from app.services.risk_marker import risk_marker
     from sqlalchemy import desc
     
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -440,7 +454,7 @@ async def render_template(
     """使用指定模板渲染访谈成果"""
     from app.services.template_service import TemplateService
     
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -474,7 +488,7 @@ async def export_output(
     from app.services.template_service import TemplateService
     from app.services.export_service import ExportService
     
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -533,7 +547,7 @@ async def generate_report(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """生成经验分析报告（支持任意时间重新生成，可指定深度）"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -550,7 +564,7 @@ async def get_report(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取已生成的经验分析报告（支持按深度获取）"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -575,7 +589,7 @@ async def export_report(
     from app.services.report_service import report_service
     from app.services.export_service import ExportService
 
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -632,7 +646,7 @@ async def start_timer(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """开始计时"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -651,7 +665,7 @@ async def pause_timer(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """暂停计时"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -670,7 +684,7 @@ async def resume_timer(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """恢复计时"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -689,7 +703,7 @@ async def get_timer_status(
     current_user: Optional[User] = Depends(get_current_active_user_optional),
 ):
     """获取计时状态"""
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -715,7 +729,7 @@ async def transcribe_voice(
 
     转录文字不会自动保存为消息，由前端放入输入框供专家编辑后手动发送
     """
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -758,7 +772,7 @@ async def complete_round(
     3. 保存为用户消息
     4. 生成 AI 下一个问题
     """
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
@@ -833,7 +847,7 @@ async def realtime_transcribe(
                 current_user = result.scalar_one_or_none()
 
     # 访谈权限校验
-    user_id = str(current_user.id) if current_user else None
+    user_id = resolve_user_filter(current_user)
     interview_service = InterviewService(db)
     interview = await interview_service.get_interview(interview_id, user_id=user_id)
     if not interview:

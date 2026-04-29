@@ -6,4 +6,4 @@
  * 注意：此开关仅控制前端的拦截行为，登录/注册相关代码均保留，
  * 修改后需重新编译/刷新页面生效。
  */
-export const SKIP_AUTH = true;
+export const SKIP_AUTH = false;

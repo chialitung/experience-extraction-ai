@@ -141,6 +141,9 @@ class TestGetStageWordCount:
         msg_new.content = "new"
         msg_new.extra_metadata = {}
         msg_new.created_at = datetime.utcnow()  # 晚于转换时间
+        # 确保 msg_new 时间严格晚于 transition_time，避免微秒级相同导致被跳过
+        from datetime import timedelta
+        msg_new.created_at += timedelta(seconds=1)
         
         service.get_interview = AsyncMock(return_value=base_interview)
         service.get_messages = AsyncMock(return_value=[msg_old, msg_new])
@@ -212,10 +215,11 @@ class TestShouldForceAdvance:
     async def test_layer1_llm_string_false(self, service, base_interview):
         """第1层：LLM返回字符串'false' → 进入下一层判断"""
         service.get_interview = AsyncMock(return_value=base_interview)
+        service.get_messages = AsyncMock(return_value=[])
         service._get_stage_word_count = AsyncMock(return_value=100)  # 未超字数
         service._count_turns_in_current_state = AsyncMock(return_value=1)  # 未超轮数
         service._calculate_stage_limit = MagicMock(return_value=5)
-        
+
         result = await service._should_force_advance(base_interview.id, {"should_advance": "false"})
         assert result is False
         
@@ -237,12 +241,13 @@ class TestShouldForceAdvance:
         """第2层：字数未超限 → 进入第3层判断"""
         base_interview.expected_duration = 30
         base_interview.current_state = InterviewState.CONFIRMATION  # 上限300字
-        
+
         service.get_interview = AsyncMock(return_value=base_interview)
+        service.get_messages = AsyncMock(return_value=[])
         service._get_stage_word_count = AsyncMock(return_value=200)  # 未超300
         service._count_turns_in_current_state = AsyncMock(return_value=2)  # 未超轮数
         service._calculate_stage_limit = MagicMock(return_value=5)
-        
+
         result = await service._should_force_advance(base_interview.id, {"should_advance": False})
         assert result is False
         
@@ -262,12 +267,13 @@ class TestShouldForceAdvance:
     async def test_layer3_turn_limit_not_exceeded(self, service, base_interview):
         """第3层：轮数未超限 → 不推进"""
         base_interview.expected_duration = 30
-        
+
         service.get_interview = AsyncMock(return_value=base_interview)
+        service.get_messages = AsyncMock(return_value=[])
         service._get_stage_word_count = AsyncMock(return_value=100)  # 未超字数
         service._count_turns_in_current_state = AsyncMock(return_value=2)  # 未超轮数
         service._calculate_stage_limit = MagicMock(return_value=5)
-        
+
         result = await service._should_force_advance(base_interview.id, {"should_advance": False})
         assert result is False
         
@@ -295,15 +301,15 @@ class TestCalculateStageLimit:
         """60分钟访谈的轮数上限"""
         base_interview.expected_duration = 60
         limit = service._calculate_stage_limit(base_interview)
-        # 60 / 2.5 = 24 total turns, min(36, max(12, 24)) = 24, 24/6 = 4, min(4, 5) = 4
-        assert limit == 4
+        # 60 / 2.5 = 24 total turns, min(36, max(12, 24)) = 24, 24/6 = 4, min(4, MAX_TURNS_PER_STATE=3) = 3
+        assert limit == 3
         
     def test_120min_interview_capped(self, service, base_interview):
         """120分钟访谈，轮数上限被MAX_TURNS_PER_STATE限制"""
         base_interview.expected_duration = 120
         limit = service._calculate_stage_limit(base_interview)
-        # 120 / 2.5 = 48 total turns, min(36, max(12, 48)) = 36, 36/6 = 6, min(6, 5) = 5
-        assert limit == 5
+        # 120 / 2.5 = 48 total turns, min(36, max(12, 48)) = 36, 36/6 = 6, min(6, MAX_TURNS_PER_STATE=3) = 3
+        assert limit == 3
         
     def test_15min_interview_minimum(self, service, base_interview):
         """15分钟访谈，至少保证12轮总轮数"""

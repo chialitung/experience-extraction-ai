@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Interview, Message, StructuredContent, Blueprint, ExpertProfile, ContentAnalysis } from '@/types';
 
-interface TimingState {
+export interface TimingState {
   status: 'stopped' | 'running' | 'paused' | 'completed';
   elapsedSeconds: number;
 }

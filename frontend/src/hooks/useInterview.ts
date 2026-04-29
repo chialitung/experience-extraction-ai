@@ -113,6 +113,9 @@ export function useInterview() {
     try {
       const response = await interviewApi.sendMessage(id, content);
       store.addMessage(response.data);
+      // 刷新访谈状态（后端可能已推进阶段）
+      const interviewRes = await interviewApi.get(id);
+      store.setCurrentInterview(interviewRes.data);
       return response.data;
     } catch (error: any) {
       store.setError(error.response?.data?.detail || '发送消息失败');
@@ -169,6 +172,8 @@ export function useInterview() {
               };
               store.addMessage(finalMessage);
               store.setIsStreaming(false);
+              // 刷新访谈状态（后端可能已推进阶段）
+              interviewApi.get(id).then(res => store.setCurrentInterview(res.data)).catch(() => {});
               return;
             } else {
               aiContent += data;
@@ -280,6 +285,9 @@ export function useInterview() {
       if (response.data.ai_message) {
         store.addMessage(response.data.ai_message);
       }
+      // 刷新访谈状态（后端可能已推进阶段）
+      const interviewRes = await interviewApi.get(id);
+      store.setCurrentInterview(interviewRes.data);
       return response.data;
     } catch (error: any) {
       store.setError(error.response?.data?.detail || '进入下一轮失败');

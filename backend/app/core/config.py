@@ -45,9 +45,31 @@ class Settings(BaseSettings):
     BAIDU_SPEECH_API_KEY: Optional[str] = None
     BAIDU_SPEECH_SECRET_KEY: Optional[str] = None
 
+    # Mock Transcription (for E2E testing / demo)
+    MOCK_TRANSCRIPTION: bool = False
+
+    # Email (SMTP)
+    SMTP_HOST: Optional[str] = "smtp.qq.com"
+    SMTP_PORT: int = 465
+    SMTP_USERNAME: Optional[str] = "160534520@qq.com"
+    SMTP_PASSWORD: Optional[str] = "tpalkvqaszqnbhje"
+    SMTP_FROM_EMAIL: Optional[str] = "160534520@qq.com"
+    SMTP_SSL: bool = True
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+
+    # Topic Drift Detection
+    TOPIC_DRIFT_THRESHOLD: float = 0.35
+    TOPIC_DRIFT_GRAY_LOWER: float = 0.15
+    TOPIC_DRIFT_PROMPT_INJECT: float = 0.20
+    TOPIC_DRIFT_MAX_HISTORY: int = 10
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def smtp_enabled(self) -> bool:
+        return all([self.SMTP_HOST, self.SMTP_USERNAME, self.SMTP_PASSWORD, self.SMTP_FROM_EMAIL])
     
     class Config:
         env_file = ".env"

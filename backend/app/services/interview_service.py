@@ -1,6 +1,8 @@
+import asyncio
 import json
 from typing import Optional, Dict, Any, List
 from uuid import UUID
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from app.models.interview import Interview, Message, StructuredContent, InterviewState, InterviewStatus, OutputFormat
@@ -13,6 +15,7 @@ from app.services.risk_marker import risk_marker, RiskMarkerResult
 from app.services.report_service import report_service
 from app.core.cache import structured_content_cache, interview_cache
 from app.core.logging import get_logger
+from app.core.config import settings
 
 
 class InterviewService:
@@ -68,12 +71,19 @@ class InterviewService:
     }
 
     def _normalize_state_name(self, name: Optional[str]) -> str:
-        """标准化状态名：去除空格、标点、统一大小写"""
+        """标准化状态名：去除空格、标点、统一大小写，支持前缀匹配"""
         if not name:
             return ""
-        cleaned = name.strip().lower().replace(" ", "").replace("·", "").replace("•", "").replace("：", ":").replace("\u3000", "")
+        cleaned = name.strip().lower().replace(" ", "").replace("·", "").replace("•", "").replace("：", ":").replace("　", "")
         cleaned = cleaned.rstrip("。.,;!?！？")
-        return self._STATE_NORMALIZATION.get(cleaned, cleaned)
+        # 精确匹配
+        if cleaned in self._STATE_NORMALIZATION:
+            return self._STATE_NORMALIZATION[cleaned]
+        # 前缀匹配：处理 LLM 输出的带描述状态名，如"复盘事件获取成功案例背景"
+        for key, value in self._STATE_NORMALIZATION.items():
+            if cleaned.startswith(key):
+                return value
+        return cleaned
 
     def _calculate_stage_limit(self, interview: Interview) -> int:
         """根据访谈总时长计算每阶段最大轮数"""
@@ -121,6 +131,10 @@ class InterviewService:
 
     async def _get_stage_word_count(self, interview_id: UUID) -> int:
         """统计当前阶段用户回答（role == 'user'）的总字数"""
+        cache_key = f"stage_word_count:{interview_id}"
+        if cache_key in self._query_cache:
+            return self._query_cache[cache_key]
+
         interview = await self.get_interview(interview_id)
         if not interview:
             return 0
@@ -187,11 +201,13 @@ class InterviewService:
                 "event": "stage_word_count_complete",
             },
         )
+        self._query_cache[cache_key] = total
         return total
 
     def __init__(self, db: AsyncSession):
         self.db = db
         self.logger = get_logger("app.interview")
+        self._query_cache: Dict[str, Any] = {}
 
     def _resolve_output_formats(self, formats: List[str]) -> List[str]:
         """解析目标成果形式列表，处理 comprehensive 快捷选项"""
@@ -549,13 +565,15 @@ class InterviewService:
                     extra={"interview_id": str(interview_id), "event": "expert_profile_updated"},
                 )
 
-        # 内容分析：每轮都进行
-        structured = await self._get_structured_content(interview_id)
+        # 内容分析：每轮都进行 - 并行执行独立的预LLM查询
         current_state = interview.current_state.value
         current_state_cn = self.STATE_NAME_MAP.get(current_state, current_state)
         state_goal = self.STATE_GOALS.get(current_state, "深入挖掘专家经验")
-        turns = await self._count_turns_in_current_state(interview_id)
-        stage_word_count = await self._get_stage_word_count(interview_id)
+        structured, turns, stage_word_count = await asyncio.gather(
+            self._get_structured_content(interview_id),
+            self._count_turns_in_current_state(interview_id),
+            self._get_stage_word_count(interview_id),
+        )
 
         analysis = content_analyzer.full_analysis(
             answer=user_message,
@@ -563,8 +581,28 @@ class InterviewService:
             current_step=current_state,
             structured=structured,
             blueprint=interview.blueprint,
+            drift_history=interview.drift_history or [],
         )
         analysis_dict = content_analyzer.to_dict(analysis)
+        # LLM 灰区仲裁：规则置信度处于 (0.15, 0.35) 时触发语义判定
+        # 优化：前1轮不触发灰区仲裁，早期回答天然具有探索性
+        if (settings.TOPIC_DRIFT_GRAY_LOWER < analysis.off_topic_confidence < settings.TOPIC_DRIFT_THRESHOLD
+                and turns > 1):
+            last_question = await self._get_last_ai_question(interview_id)
+            llm_drift = await self._detect_topic_drift_llm(
+                user_message=user_message,
+                theme=interview.theme,
+                current_step=current_state,
+                state_goal=state_goal,
+                last_question=last_question,
+            )
+            analysis_dict['off_topic'] = llm_drift['is_off_topic']
+            analysis_dict['off_topic_confidence'] = llm_drift['confidence']
+            analysis_dict['off_topic_reason'] = llm_drift['reason']
+            analysis_dict['suggested_correction'] = llm_drift.get('suggested_correction', '')
+
+        # 更新漂移历史
+        await self._update_drift_history(interview_id, analysis_dict)
 
         # 计算时间预算（含阶段差异化字数预算）
         time_budget = self._calculate_time_budget(interview, turns, current_state, stage_word_count)
@@ -751,13 +789,25 @@ class InterviewService:
         )
 
         # 1. LLM 整理转录内容
-        refined = await self._refine_transcription(transcription, current_question)
+        # 优化：纯文本模式（notes 有意义且 transcription 为空/极短）跳过 LLM 整理
+        notes_text = "\n".join(notes) if notes else ""
+        has_meaningful_notes = len(notes_text.strip()) >= 20
+        if not transcription or not transcription.strip():
+            refined = ""
+        elif has_meaningful_notes and len(transcription.strip()) < 50:
+            # 文本模式为主，转录极短（误触发）：跳过 LLM 整理
+            refined = ""
+        else:
+            refined = await self._refine_transcription(transcription, current_question)
 
         # 2. 拼接备注
         full_content = refined
         if notes:
             notes_text = "\n".join([f"【备注{i + 1}】{n}" for i, n in enumerate(notes)])
-            full_content = f"{refined}\n\n{notes_text}"
+            if refined:
+                full_content = f"{refined}\n\n{notes_text}"
+            else:
+                full_content = notes_text
 
         # 3. 保存用户消息（手动保存，以便附加 extra_metadata）
         user_msg = await self.add_message(
@@ -1010,13 +1060,15 @@ class InterviewService:
                     extra={"interview_id": str(interview_id), "event": "expert_profile_updated"},
                 )
 
-        # 内容分析
-        structured = await self._get_structured_content(interview_id)
+        # 内容分析 - 并行执行独立的预LLM查询
         current_state = interview.current_state.value
         current_state_cn = self.STATE_NAME_MAP.get(current_state, current_state)
         state_goal = self.STATE_GOALS.get(current_state, "深入挖掘专家经验")
-        turns = await self._count_turns_in_current_state(interview_id)
-        stage_word_count = await self._get_stage_word_count(interview_id)
+        structured, turns, stage_word_count = await asyncio.gather(
+            self._get_structured_content(interview_id),
+            self._count_turns_in_current_state(interview_id),
+            self._get_stage_word_count(interview_id),
+        )
 
         analysis = content_analyzer.full_analysis(
             answer=user_message,
@@ -1024,8 +1076,28 @@ class InterviewService:
             current_step=current_state,
             structured=structured,
             blueprint=interview.blueprint,
+            drift_history=interview.drift_history or [],
         )
         analysis_dict = content_analyzer.to_dict(analysis)
+        # LLM 灰区仲裁：规则置信度处于 (0.15, 0.35) 时触发语义判定
+        # 优化：前1轮不触发灰区仲裁，早期回答天然具有探索性
+        if (settings.TOPIC_DRIFT_GRAY_LOWER < analysis.off_topic_confidence < settings.TOPIC_DRIFT_THRESHOLD
+                and turns > 1):
+            last_question = await self._get_last_ai_question(interview_id)
+            llm_drift = await self._detect_topic_drift_llm(
+                user_message=user_message,
+                theme=interview.theme,
+                current_step=current_state,
+                state_goal=state_goal,
+                last_question=last_question,
+            )
+            analysis_dict['off_topic'] = llm_drift['is_off_topic']
+            analysis_dict['off_topic_confidence'] = llm_drift['confidence']
+            analysis_dict['off_topic_reason'] = llm_drift['reason']
+            analysis_dict['suggested_correction'] = llm_drift.get('suggested_correction', '')
+
+        # 更新漂移历史
+        await self._update_drift_history(interview_id, analysis_dict)
 
         time_budget = self._calculate_time_budget(interview, turns, current_state, stage_word_count)
         interview = await self._get_interview_for_update(interview_id)
@@ -1214,8 +1286,28 @@ class InterviewService:
             current_step=current_state,
             structured=structured,
             blueprint=interview.blueprint,
+            drift_history=interview.drift_history or [],
         )
         analysis_dict = content_analyzer.to_dict(analysis)
+        # LLM 灰区仲裁：规则置信度处于 (0.15, 0.35) 时触发语义判定
+        # 优化：前1轮不触发灰区仲裁，早期回答天然具有探索性
+        if (settings.TOPIC_DRIFT_GRAY_LOWER < analysis.off_topic_confidence < settings.TOPIC_DRIFT_THRESHOLD
+                and turns > 1):
+            last_question = await self._get_last_ai_question(interview_id)
+            llm_drift = await self._detect_topic_drift_llm(
+                user_message=user_message,
+                theme=interview.theme,
+                current_step=current_state,
+                state_goal=state_goal,
+                last_question=last_question,
+            )
+            analysis_dict['off_topic'] = llm_drift['is_off_topic']
+            analysis_dict['off_topic_confidence'] = llm_drift['confidence']
+            analysis_dict['off_topic_reason'] = llm_drift['reason']
+            analysis_dict['suggested_correction'] = llm_drift.get('suggested_correction', '')
+
+        # 更新漂移历史
+        await self._update_drift_history(interview_id, analysis_dict)
 
         # 计算时间预算（含阶段差异化字数预算）
         time_budget = self._calculate_time_budget(interview, turns, current_state, stage_word_count)
@@ -1403,9 +1495,113 @@ class InterviewService:
         "tool_extract": "将经验转化为可直接使用的工具：话术模板、检查表、流程图要点、口诀等。追问专家是否有现成的文档或模板。",
         "confirmation": "复述已萃取的核心内容，请专家确认准确性。如有偏差，请专家纠正并补充。",
     }
-    
+
+    # ========== LLM 语义主题偏离检测（灰区仲裁）==========
+
+    async def _get_last_ai_question(self, interview_id: UUID) -> str:
+        """获取最近一条 AI 提问的内容"""
+        messages = await self.get_messages(interview_id, limit=20)
+        for msg in reversed(messages):
+            if msg.role == "assistant" and msg.content:
+                return msg.content
+        return ""
+
+    async def _detect_topic_drift_llm(
+        self,
+        user_message: str,
+        theme: str,
+        current_step: str,
+        state_goal: str,
+        last_question: str,
+    ) -> Dict[str, Any]:
+        """LLM 语义主题偏离检测（灰区仲裁）
+
+        当规则引擎置信度处于灰区 (0.15, 0.35) 时，调用 LLM 进行语义判定。
+        返回结果与 detect_off_topic 格式兼容。
+        """
+        system_prompt = prompt_manager.render("tasks/topic_drift_arbitration_system.md", {})
+        user_prompt = prompt_manager.render("tasks/topic_drift_arbitration_user.md", {
+            "theme": theme,
+            "current_step": current_step,
+            "state_goal": state_goal,
+            "last_question": last_question,
+            "user_message": user_message,
+        })
+
+        try:
+            result = await llm_service.generate_json(
+                system_prompt=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                temperature=0.0,
+                max_tokens=500,
+            )
+            is_off_topic = bool(result.get("is_off_topic", False))
+            confidence = float(result.get("confidence", 0.5))
+            confidence = max(0.0, min(1.0, confidence))
+            reason = str(result.get("reason", "LLM语义判定完成"))
+            suggested_correction = str(result.get("suggested_correction", ""))
+
+            self.logger.info(
+                "LLM topic drift arbitration completed",
+                extra={
+                    "event": "topic_drift_llm_arbitration",
+                    "is_off_topic": is_off_topic,
+                    "confidence": confidence,
+                    "current_step": current_step,
+                },
+            )
+            return {
+                "is_off_topic": is_off_topic,
+                "confidence": confidence,
+                "reason": f"【LLM语义判定】{reason}",
+                "suggested_correction": suggested_correction,
+            }
+        except Exception as e:
+            self.logger.error(
+                f"LLM topic drift detection failed: {e}",
+                extra={"event": "topic_drift_llm_error", "current_step": current_step},
+                exc_info=True,
+            )
+            # 出错时保守处理：不判定为偏离
+            return {
+                "is_off_topic": False,
+                "confidence": 0.1,
+                "reason": "LLM语义判定出错，采用保守策略（不偏离）",
+                "suggested_correction": "",
+            }
+
+    async def _update_drift_history(self, interview_id: UUID, analysis_dict: Dict[str, Any]) -> None:
+        """更新访谈的漂移历史记录（保留最近 max_history 条）"""
+        interview = await self.get_interview(interview_id)
+        if not interview:
+            return
+
+        history = list(interview.drift_history or [])
+        history.append({
+            "confidence": analysis_dict.get("off_topic_confidence", 0),
+            "is_off_topic": analysis_dict.get("off_topic", False),
+            "reason": analysis_dict.get("off_topic_reason", ""),
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
+        # 保留最近 max_history 条
+        max_history = content_analyzer.max_history
+        if len(history) > max_history:
+            history = history[-max_history:]
+
+        from sqlalchemy import update as sa_update
+        await self.db.execute(
+            sa_update(Interview)
+            .where(Interview.id == interview_id)
+            .values(drift_history=history)
+        )
+
     async def _count_turns_in_current_state(self, interview_id: UUID) -> int:
         """统计当前状态下已进行的AI提问轮数（含开场问题）"""
+        cache_key = f"turns_count:{interview_id}"
+        if cache_key in self._query_cache:
+            return self._query_cache[cache_key]
+
         interview = await self.get_interview(interview_id)
         if not interview:
             return 0
@@ -1474,6 +1670,7 @@ class InterviewService:
                 "event": "turn_count_complete",
             },
         )
+        self._query_cache[cache_key] = count
         return count
 
     # 第四层兜底：AI回复内容饱和度检测触发词

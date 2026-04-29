@@ -13,5 +13,7 @@ class User(Base):
     full_name = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
+    reset_token_hash = Column(String(255), nullable=True)
+    reset_token_expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

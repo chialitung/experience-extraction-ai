@@ -254,6 +254,50 @@ export const authApi = {
 
   updateMe: (data: { full_name?: string; password?: string }) =>
     api.patch<User>('/auth/me', data),
+
+  // Admin APIs
+  listUsers: (skip = 0, limit = 100) =>
+    api.get<{ items: User[]; total: number }>(`/auth/admin/users?skip=${skip}&limit=${limit}`),
+
+  getUser: (id: string) =>
+    api.get<User>(`/auth/admin/users/${id}`),
+
+  updateUser: (id: string, data: { full_name?: string; email?: string; is_active?: boolean; is_superuser?: boolean; password?: string }) =>
+    api.patch<User>(`/auth/admin/users/${id}`, data),
+
+  deleteUser: (id: string) =>
+    api.delete(`/auth/admin/users/${id}`),
+
+  // Password Reset
+  requestPasswordReset: (email: string) =>
+    api.post<{ message: string }>('/auth/password-reset-request', { email }),
+
+  confirmPasswordReset: (token: string, new_password: string) =>
+    api.post<{ message: string }>('/auth/password-reset-confirm', { token, new_password }),
+};
+
+// ==================== Config APIs ====================
+
+export interface LlmConfig {
+  provider: string;
+  label: string;
+  model: string;
+  base_url: string;
+  environment: string;
+  debug: boolean;
+}
+
+export const configApi = {
+  get: () => api.get<LlmConfig>('/config'),
+  update: (data: {
+    default_llm_provider?: string;
+    deepseek_model?: string;
+    deepseek_api_key?: string;
+    deepseek_base_url?: string;
+    baidu_speech_app_id?: string;
+    baidu_speech_api_key?: string;
+    baidu_speech_secret_key?: string;
+  }) => api.put('/config', data),
 };
 
 export default api;

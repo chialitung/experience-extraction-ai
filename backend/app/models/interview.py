@@ -56,6 +56,9 @@ class Interview(Base):
     # Value assessment
     value_assessment = Column(JSON, default=dict)
 
+    # Topic drift history (跨轮次漂移追踪)
+    drift_history = Column(JSON, default=list)
+
     # Final output
     final_output = Column(JSON, default=dict)
 

@@ -12,34 +12,9 @@ export function InterviewCreatePage() {
     theme: '',
     background: '',
     expert_role: '',
-    expected_duration: 60,
+    expected_duration: 30,
     target_output_format: ['comprehensive'] as string[],
   });
-
-  const toggleFormat = (value: string) => {
-    setFormData((prev) => {
-      // 点击 comprehensive 时直接切换
-      if (value === 'comprehensive') {
-        const isSelecting = !prev.target_output_format.includes('comprehensive');
-        return {
-          ...prev,
-          target_output_format: isSelecting
-            ? ['comprehensive']
-            : ['script_card'],
-        };
-      }
-      // 点击其他项时，如果 comprehensive 已选中则取消它
-      let current = prev.target_output_format.filter((v) => v !== 'comprehensive');
-      const isSelected = current.includes(value);
-      if (isSelected) {
-        current = current.filter((v) => v !== value);
-        if (current.length === 0) current = ['script_card'];
-      } else {
-        current = [...current, value];
-      }
-      return { ...prev, target_output_format: current };
-    });
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

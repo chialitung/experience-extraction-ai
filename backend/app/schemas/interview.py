@@ -51,6 +51,7 @@ class InterviewResponse(BaseModel):
     state_history: List[Dict[str, Any]]
     expert_profile: Dict[str, Any]
     value_assessment: Dict[str, Any]
+    drift_history: List[Dict[str, Any]]
     final_output: Dict[str, Any]
     status: InterviewStatus
     created_at: datetime
@@ -241,7 +242,7 @@ class VoiceTranscribeResponse(BaseModel):
 # ==================== Round Complete Schemas ====================
 
 class RoundCompleteRequest(BaseModel):
-    transcription: str = Field(..., min_length=1, description="当前轮次录音转录的原始文字")
+    transcription: Optional[str] = Field(None, description="当前轮次录音转录的原始文字")
     notes: List[str] = Field(default_factory=list, description="用户补充的备注信息列表")
 
 

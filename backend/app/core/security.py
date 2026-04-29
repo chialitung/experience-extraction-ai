@@ -88,3 +88,14 @@ async def get_current_active_user_optional(
     if current_user is None or not current_user.is_active:
         return None
     return current_user
+
+
+async def get_current_admin(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user

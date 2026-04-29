@@ -15,23 +15,29 @@ export default defineConfig({
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'on-first-retry',
-    headless: false, // 打开浏览器，可视化观察
-    viewport: { width: 1280, height: 720 },
+    video: 'on', // 始终录制视频（E2E 演示用）
+    headless: true, // 无头模式，确保视频分辨率严格按 videoSize 录制（720p）
+    viewport: { width: 1920, height: 1080 },  // 1920x1080 Full HD
+    videoSize: { width: 1920, height: 1080 },
+    permissions: ['microphone'], // 自动授予麦克风权限
     launchOptions: {
-      slowMo: 500, // 慢动作，便于观察
+      args: [
+        '--use-fake-device-for-media-stream', // 模拟麦克风设备
+        '--use-fake-ui-for-media-stream',     // 自动授予媒体权限
+      ],
     },
   },
-  timeout: 300_000, // 全局超时 5 分钟（LLM 调用较慢）
+  timeout: 2_700_000, // 全局超时 45 分钟（8 轮对话 × 500字/分钟 + AI 等待时间 + 报告生成）
   expect: {
-    timeout: 120_000, // 断言超时 2 分钟
+    timeout: 180_000, // 断言超时 3 分钟
   },
   projects: [
     {
-      name: 'chrome',
+      name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'chrome', // 使用系统已安装的 Chrome，避免下载 Chromium
+        viewport: { width: 1280, height: 720 }, // 720p 标准高清
+        videoSize: { width: 1280, height: 720 },
       },
     },
   ],

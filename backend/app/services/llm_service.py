@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import time
@@ -5,6 +6,7 @@ from typing import AsyncIterator, Optional, Dict, Any, Literal
 from openai import AsyncOpenAI
 from anthropic import AsyncAnthropic
 from app.core.config import settings
+from app.core.cache import llm_response_cache
 from app.core.logging import get_logger
 
 logger = get_logger("app.llm")
@@ -262,6 +264,17 @@ class LLMService:
             return settings.DEEPSEEK_MODEL
         return settings.OPENAI_MODEL
 
+    def _generate_cache_key(self, system_prompt: str, messages: list[dict], temperature: float) -> str:
+        """为确定性LLM调用生成缓存key"""
+        content = json.dumps({
+            "provider": self.provider,
+            "model": self._get_model(),
+            "system": system_prompt,
+            "messages": messages,
+            "temperature": temperature,
+        }, sort_keys=True, ensure_ascii=False)
+        return f"llm:{hashlib.sha256(content.encode()).hexdigest()[:32]}"
+
     async def generate_json(
         self,
         system_prompt: str,
@@ -269,8 +282,25 @@ class LLMService:
         temperature: float = 0.3,
         max_tokens: int = 2000,
     ) -> Dict[str, Any]:
-        """生成结构化JSON输出"""
+        """生成结构化JSON输出（支持确定性调用缓存）"""
         start_time = time.time()
+        cache_key = None
+
+        # 仅对 temperature == 0 的确定性调用启用缓存
+        if temperature == 0:
+            cache_key = self._generate_cache_key(system_prompt, messages, temperature)
+            cached = await llm_response_cache.get(cache_key)
+            if cached is not None:
+                logger.info(
+                    "LLM JSON cache hit",
+                    extra={
+                        "provider": self.provider,
+                        "model": self._get_model(),
+                        "event": "llm_json_cache_hit",
+                    },
+                )
+                return cached
+
         if self.mock_mode:
             logger.info(
                 "LLM JSON in mock mode",
@@ -302,6 +332,9 @@ class LLMService:
                     "event": "llm_json_success",
                 },
             )
+            # 缓存确定性调用结果
+            if cache_key is not None and result is not None:
+                await llm_response_cache.set(cache_key, result)
             return result
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000

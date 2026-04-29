@@ -55,3 +55,4 @@ class TTLCache:
 # 全局缓存实例
 structured_content_cache = TTLCache(maxsize=256, ttl=30.0)
 interview_cache = TTLCache(maxsize=128, ttl=60.0)
+llm_response_cache = TTLCache(maxsize=512, ttl=300.0)

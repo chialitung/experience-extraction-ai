@@ -1,12 +1,11 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { MessageSquare, Plus, Settings, Home, LogOut, User, Menu, X, LogIn } from 'lucide-react';
+import { MessageSquare, Plus, Settings, Home, LogOut, User, Menu, X, LogIn, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { SKIP_AUTH } from '@/config/auth';
 
 export function Layout() {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // 路由切换时自动关闭移动端菜单
@@ -18,6 +17,7 @@ export function Layout() {
     { path: '/', icon: Home, label: '首页' },
     { path: '/interviews', icon: MessageSquare, label: '访谈列表' },
     { path: '/interviews/new', icon: Plus, label: '新建访谈' },
+    ...(isAdmin ? [{ path: '/admin/users', icon: Users, label: '用户管理' }] : []),
   ];
 
   const isSettingsActive = location.pathname === '/settings';
@@ -59,7 +59,10 @@ export function Layout() {
                 <User className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{user.full_name || user.email}</p>
+                <p className="font-medium truncate">
+                  {user.full_name || user.email}
+                  {isAdmin && <span className="ml-1.5 text-xs text-amber-600 font-medium">[管理员]</span>}
+                </p>
                 <p className="text-xs text-gray-400 truncate">{user.email}</p>
               </div>
             </div>

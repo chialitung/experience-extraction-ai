@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, FileText, Download, Loader2, BookOpen,
+  ArrowLeft, FileText, Loader2, BookOpen,
   ChevronDown, Printer, FileCode, FileSpreadsheet, Sparkles,
   BarChart3, Lightbulb, AlertTriangle, Wrench, Target,
   CheckCircle, Layers, MessageSquare, ListChecks, GitBranch,
-  GraduationCap, ChevronUp,
+  GraduationCap,
 } from 'lucide-react';
 import { interviewApi } from '@/services/api';
 import { OutputPageSkeleton } from '@/components/Skeleton';
@@ -16,6 +16,14 @@ const DEPTH_OPTIONS = [
   { key: 'standard', label: '标准版', desc: '2000-3000字，完整分析', icon: BookOpen },
   { key: 'deep', label: '深度版', desc: '4000-6000字，含推导过程', icon: BarChart3 },
 ];
+
+// 已生成报告的展示优先级：深度版 > 标准版 > 简要版
+const DEPTH_PRIORITY = ['deep', 'standard', 'brief'];
+
+const getGeneratedDepths = (interview: any): string[] => {
+  const reports = interview?.final_output?.analysis_reports || {};
+  return DEPTH_PRIORITY.filter((d) => d in reports);
+};
 
 const EXPORT_FORMATS = [
   { key: 'markdown', label: 'MD', icon: FileCode },
@@ -98,32 +106,38 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
 
   const loadData = async (targetDepth?: string) => {
     setLoading(true);
-    // 用户明确指定了目标深度，立即同步 UI 状态（无论该深度是否有报告）
-    if (targetDepth) {
-      setSelectedDepth(targetDepth);
-    }
     try {
-      const [interviewRes, reportRes, structuredRes] = await Promise.allSettled([
-        interviewApi.get(id!),
-        targetDepth ? interviewApi.getReport(id!, targetDepth) : interviewApi.getReport(id!),
+      // 先获取访谈数据，用于判断哪些版本已生成
+      const interviewRes = await interviewApi.get(id!);
+      setInterview(interviewRes.data);
+
+      // 确定要加载的版本
+      let depthToLoad = targetDepth;
+      if (!depthToLoad) {
+        // 初始加载：按优先级自动选择已生成的版本（深度版 > 标准版 > 简要版）
+        const generated = getGeneratedDepths(interviewRes.data);
+        if (generated.length > 0) {
+          depthToLoad = generated[0];
+        }
+      }
+      if (depthToLoad) {
+        setSelectedDepth(depthToLoad);
+      }
+
+      // 并行加载报告和结构化内容
+      const [reportRes, structuredRes] = await Promise.allSettled([
+        depthToLoad ? interviewApi.getReport(id!, depthToLoad) : interviewApi.getReport(id!),
         interviewApi.getStructuredContent(id!),
       ]);
 
-      if (interviewRes.status === 'fulfilled') {
-        setInterview(interviewRes.value.data);
-      }
-
       if (reportRes.status === 'fulfilled') {
         setReport(reportRes.value.data);
-        // 用返回报告的实际深度再次校准（兜底）
         if (reportRes.value.data.metadata?.depth) {
           setSelectedDepth(reportRes.value.data.metadata.depth);
         }
       } else {
-        // 如果指定深度没有报告，清空 report 进入空状态
-        if (targetDepth) {
-          setReport(null);
-        }
+        // 指定深度没有报告，进入空状态
+        setReport(null);
       }
 
       if (structuredRes.status === 'fulfilled') {
@@ -147,6 +161,9 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
       if (response.data.metadata?.depth) {
         setSelectedDepth(response.data.metadata.depth);
       }
+      // 刷新 interview 数据，使下拉菜单中的"已生成"标记更新
+      const interviewRes = await interviewApi.get(id);
+      setInterview(interviewRes.data);
     } catch (error: any) {
       const status = error.response?.status;
       // 强制将 detail 转为字符串，避免传入对象导致 logger / alert 序列化异常
@@ -682,7 +699,7 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    html = html.replace(/^\- (.*$)/gim, '<li class="ml-4 text-gray-700">$1</li>');
+    html = html.replace(/^- (.*$)/gim, '<li class="ml-4 text-gray-700">$1</li>');
     html = html.replace(/^\d+\. (.*$)/gim, '<li class="ml-4 text-gray-700">$1</li>');
     html = html.replace(/^> (.*$)/gim, '<blockquote class="border-l-4 border-indigo-300 pl-4 italic text-gray-600 my-3">$1</blockquote>');
     html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm my-3"><code>$1</code></pre>');
@@ -700,45 +717,36 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
     const hasReport = sections.length > 0;
 
     if (!hasReport) {
-      const currentDepthLabel = DEPTH_OPTIONS.find((d) => d.key === selectedDepth)?.label || '标准版';
+      const currentDepth = DEPTH_OPTIONS.find((d) => d.key === selectedDepth);
+      const currentDepthLabel = currentDepth?.label || '标准版';
+      const generatedDepths = getGeneratedDepths(interview);
+      const hasAnyReport = generatedDepths.length > 0;
       return (
         <div className="text-center py-16">
           <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">暂无分析报告</h3>
-          <p className="text-gray-500 mb-6 max-w-md mx-auto">
-            基于本次访谈的所有内容，AI 可以为您生成一份系统性的经验分析报告。
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">
+            {hasAnyReport ? `尚未生成${currentDepthLabel}` : '暂无分析报告'}
+          </h3>
+          <p className="text-gray-500 mb-2 max-w-md mx-auto">
+            {hasAnyReport
+              ? `您已生成 ${generatedDepths.map((d) => DEPTH_OPTIONS.find((o) => o.key === d)?.label).join('、')}，可切换查看。`
+              : '基于本次访谈的所有内容，AI 可以为您生成一份系统性的经验分析报告。'}
           </p>
-          <div className="flex flex-col items-center gap-4">
-            {/* 当前已选深度展示（只读，无需再次选择） */}
-            <div className="flex gap-3">
-              {DEPTH_OPTIONS.map((d) => (
-                <div
-                  key={d.key}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 ${
-                    selectedDepth === d.key
-                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                      : 'border-gray-200 text-gray-400 opacity-60'
-                  }`}
-                >
-                  <d.icon className="w-6 h-6" />
-                  <span className="font-semibold text-sm">{d.label}</span>
-                  <span className="text-xs text-gray-400">{d.desc}</span>
-                </div>
-              ))}
-            </div>
-            <button
-              onClick={() => handleGenerateReport()}
-              disabled={generating}
-              className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 mt-4"
-            >
-              {generating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
-              {generating ? '正在生成报告，请稍候...' : `生成${currentDepthLabel}报告`}
-            </button>
-          </div>
+          <p className="text-sm text-gray-400 mb-8 max-w-md mx-auto">
+            {currentDepth?.desc}
+          </p>
+          <button
+            onClick={() => handleGenerateReport()}
+            disabled={generating}
+            className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 mx-auto"
+          >
+            {generating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Sparkles className="w-4 h-4" />
+            )}
+            {generating ? '正在生成报告，请稍候...' : `生成${currentDepthLabel}报告`}
+          </button>
         </div>
       );
     }
@@ -920,24 +928,35 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
                   </button>
                   {showDepthDropdown && (
                     <div className="absolute left-0 mt-1 w-56 bg-white rounded-lg shadow-lg border z-50">
-                      {DEPTH_OPTIONS.map((d) => (
-                        <button
-                          key={d.key}
-                          onClick={() => {
-                            setShowDepthDropdown(false);
-                            loadData(d.key);
-                          }}
-                          className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                            selectedDepth === d.key ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <d.icon className="w-4 h-4" />
-                            <span>{d.label}</span>
-                          </div>
-                          <div className="text-xs text-gray-400 mt-0.5 ml-6">{d.desc}</div>
-                        </button>
-                      ))}
+                      {(() => {
+                        const generatedDepths = getGeneratedDepths(interview);
+                        return DEPTH_OPTIONS.map((d) => {
+                          const isGenerated = generatedDepths.includes(d.key);
+                          return (
+                            <button
+                              key={d.key}
+                              onClick={() => {
+                                setShowDepthDropdown(false);
+                                loadData(d.key);
+                              }}
+                              className={`w-full text-left px-4 py-3 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                                selectedDepth === d.key ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <d.icon className="w-4 h-4" />
+                                <span>{d.label}</span>
+                                {isGenerated && (
+                                  <span className="ml-auto text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                    已生成
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-0.5 ml-6">{d.desc}</div>
+                            </button>
+                          );
+                        });
+                      })()}
                     </div>
                   )}
                 </div>
@@ -950,7 +969,7 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
                 <button
                   key={fmt.key}
                   onClick={() => handleExport(fmt.key)}
-                  disabled={exporting}
+                  disabled={exporting || (topView === 'report' && !report)}
                   className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center text-sm disabled:opacity-50"
                 >
                   {exporting ? (

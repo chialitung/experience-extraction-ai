@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LogIn, UserPlus, Mail, Lock, User, Loader2, Eye, EyeOff } from 'lucide-react';
 
@@ -61,14 +61,14 @@ export function AuthPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">姓名（可选）</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">昵称（可选）</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="您的姓名"
+                  placeholder="您的昵称"
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm"
                 />
               </div>
@@ -112,6 +112,17 @@ export function AuthPage() {
               </button>
             </div>
           </div>
+
+          {isLogin && (
+            <div className="flex justify-end -mt-2">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              >
+                忘记密码？
+              </Link>
+            </div>
+          )}
 
           <button
             type="submit"

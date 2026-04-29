@@ -5,6 +5,7 @@ import { authApi } from '@/services/api';
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, fullName?: string) => Promise<void>;
@@ -71,11 +72,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(res.data));
   }, []);
 
+  const isAdmin = user?.is_superuser ?? false;
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated: !!user,
+        isAdmin,
         isLoading,
         login,
         register,
