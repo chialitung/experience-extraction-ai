@@ -5,7 +5,7 @@ import {
   ChevronDown, Printer, FileCode, FileSpreadsheet, Sparkles,
   BarChart3, Lightbulb, AlertTriangle, Wrench, Target,
   CheckCircle, Layers, MessageSquare, ListChecks, GitBranch,
-  GraduationCap,
+  GraduationCap, Award, Table, Star, CheckSquare,
 } from 'lucide-react';
 import { interviewApi } from '@/services/api';
 import { OutputPageSkeleton } from '@/components/Skeleton';
@@ -15,10 +15,11 @@ const DEPTH_OPTIONS = [
   { key: 'brief', label: '简要版', desc: '800-1200字，聚焦核心结论', icon: Layers },
   { key: 'standard', label: '标准版', desc: '2000-3000字，完整分析', icon: BookOpen },
   { key: 'deep', label: '深度版', desc: '4000-6000字，含推导过程', icon: BarChart3 },
+  { key: 'expert', label: '专家版', desc: '6000-10000字，完整方法论', icon: Award },
 ];
 
-// 已生成报告的展示优先级：深度版 > 标准版 > 简要版
-const DEPTH_PRIORITY = ['deep', 'standard', 'brief'];
+// 已生成报告的展示优先级：专家版 > 深度版 > 标准版 > 简要版
+const DEPTH_PRIORITY = ['expert', 'deep', 'standard', 'brief'];
 
 const getGeneratedDepths = (interview: any): string[] => {
   const reports = interview?.final_output?.analysis_reports || {};
@@ -26,10 +27,8 @@ const getGeneratedDepths = (interview: any): string[] => {
 };
 
 const EXPORT_FORMATS = [
-  { key: 'markdown', label: 'MD', icon: FileCode },
   { key: 'docx', label: 'Word', icon: FileSpreadsheet },
   { key: 'pdf', label: 'PDF', icon: FileText },
-  { key: 'json', label: 'JSON', icon: FileCode },
 ];
 
 const OUTPUT_TABS = [
@@ -198,12 +197,13 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
       }
       const blob = response.data as Blob;
       const url = URL.createObjectURL(blob);
+
       const a = document.createElement('a');
       a.href = url;
       const extMap: Record<string, string> = {
         markdown: 'md',
         docx: 'docx',
-        pdf: 'html',
+        pdf: 'pdf',
         json: 'json',
       };
       const ext = extMap[format] || format;
@@ -673,19 +673,25 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
   const getReportSections = (): ReportSection[] => {
     if (!report?.analysis_report) return [];
     const ar = report.analysis_report;
-    return [
+    const baseSections = [
       { key: 'executive_summary', title: '执行摘要', icon: Sparkles, content: ar.executive_summary },
       { key: 'case_background', title: '案例背景', icon: FileText, content: ar.case_background },
+      { key: 'four_layer_structure', title: '头-身-足-包四层结构', icon: Layers, content: ar.four_layer_structure },
       { key: 'methodology_framework', title: '方法论框架', icon: Target, content: ar.methodology_framework },
       { key: 'key_steps_analysis', title: '关键步骤详解', icon: CheckCircle, content: ar.key_steps_analysis },
       { key: 'decision_logic_analysis', title: '决策逻辑深度分析', icon: Lightbulb, content: ar.decision_logic_analysis },
+      { key: 'process_obstacle_mapping', title: '流程-障碍映射', icon: Table, content: ar.process_obstacle_mapping },
+      { key: 'root_cause_analysis', title: '5Why根因链分析', icon: GitBranch, content: ar.root_cause_analysis },
       { key: 'obstacles_and_risks', title: '风险与挑战分析', icon: AlertTriangle, content: ar.obstacles_and_risks },
       { key: 'tools_and_scripts', title: '工具与话术清单', icon: Wrench, content: ar.tools_and_scripts },
       { key: 'application_guidance', title: '应用建议', icon: Target, content: ar.application_guidance },
+      { key: 'critical_success_factors', title: '关键成功因素', icon: Star, content: ar.critical_success_factors },
       { key: 'value_assessment', title: '价值评估', icon: BarChart3, content: ar.value_assessment },
       { key: 'lessons_learned', title: '可迁移的经验教训', icon: Lightbulb, content: ar.lessons_learned },
       { key: 'references', title: '相关概念与理论引用', icon: BookOpen, content: ar.references },
-    ].filter((s) => typeof s.content === 'string' && s.content.trim().length > 0);
+      { key: 'three_review_assessment', title: '三审定稿评估', icon: CheckSquare, content: ar.three_review_assessment },
+    ];
+    return baseSections.filter((s) => typeof s.content === 'string' && s.content.trim().length > 0);
   };
 
   const renderMarkdownContent = (content: string) => {
@@ -704,6 +710,43 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
     html = html.replace(/^> (.*$)/gim, '<blockquote class="border-l-4 border-indigo-300 pl-4 italic text-gray-600 my-3">$1</blockquote>');
     html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm my-3"><code>$1</code></pre>');
     html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-red-600 px-1.5 py-0.5 rounded text-sm">$1</code>');
+
+    // Markdown tables
+    html = html.replace(
+      /((?:\s*\|[^\n]*\|\s*(?:\n|$))+)/g,
+      (tableBlock: string) => {
+        const rows = tableBlock.trim().split('\n').filter((r) => r.trim());
+        if (rows.length < 2) return tableBlock;
+        // Second row should be the separator row (contains only -, |, :, and spaces)
+        const separatorRow = rows[1].trim();
+        const isSeparator = /^\|[\s\-:|]+\|$/.test(separatorRow);
+        if (!isSeparator) return tableBlock;
+
+        let tableHtml = '<table class="w-full border-collapse border border-gray-300 my-4 text-sm">';
+        rows.forEach((row, idx) => {
+          if (idx === 1) return; // skip separator row
+          const cells = row
+            .trim()
+            .replace(/^\|/, '')
+            .replace(/\|$/, '')
+            .split('|')
+            .map((c) => c.trim());
+          const tag = idx === 0 ? 'th' : 'td';
+          const cellClass =
+            idx === 0
+              ? 'border border-gray-300 px-3 py-2 bg-gray-50 font-semibold text-gray-900 text-left'
+              : 'border border-gray-300 px-3 py-2 text-gray-700 text-left';
+          tableHtml += '<tr>';
+          cells.forEach((cell) => {
+            tableHtml += `<${tag} class="${cellClass}">${cell}</${tag}>`;
+          });
+          tableHtml += '</tr>';
+        });
+        tableHtml += '</table>';
+        return tableHtml;
+      }
+    );
+
     html = html.replace(/\n\n/g, '</p><p class="text-gray-700 leading-relaxed my-2">');
     html = '<p class="text-gray-700 leading-relaxed my-2">' + html + '</p>';
     html = html.replace(/<p class="text-gray-700 leading-relaxed my-2"><\/p>/g, '');

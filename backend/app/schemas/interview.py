@@ -147,6 +147,29 @@ class RiskItem(BaseModel):
     prevention: Optional[str] = None
 
 
+class ScenarioVariableItem(BaseModel):
+    scenario: str
+    variables: List[str]
+    adaptation: str
+
+
+class SuccessFactorItem(BaseModel):
+    factor: str
+    gold: int = Field(..., ge=1, le=10, description="高价值")
+    wood: int = Field(..., ge=1, le=10, description="有难度")
+    water: int = Field(..., ge=1, le=10, description="常使用")
+    fire: int = Field(..., ge=1, le=10, description="急需要")
+    earth: int = Field(..., ge=1, le=10, description="覆盖广")
+    priority: int
+
+
+class RootCauseChainItem(BaseModel):
+    risk_id: str
+    risk_description: str
+    chain: List[str]
+    prevention: str
+
+
 class StructuredContentResponse(BaseModel):
     id: UUID
     interview_id: UUID
@@ -156,6 +179,9 @@ class StructuredContentResponse(BaseModel):
     tools: List[ToolItem]
     risks: List[RiskItem]
     decisions: List[Dict[str, Any]]
+    scenario_variables: List[ScenarioVariableItem] = []
+    success_factors: List[SuccessFactorItem] = []
+    root_cause_chains: List[RootCauseChainItem] = []
     created_at: datetime
     updated_at: datetime
 
@@ -179,7 +205,7 @@ class OutputResponse(BaseModel):
 # ==================== Report Schemas ====================
 
 class ReportGenerateRequest(BaseModel):
-    depth: str = Field("standard", pattern="^(brief|standard|deep)$")
+    depth: str = Field("standard", pattern="^(brief|standard|deep|expert)$")
 
 
 class ReportMetadata(BaseModel):
@@ -203,6 +229,14 @@ class AnalysisReport(BaseModel):
     references: Optional[str] = None
 
 
+class AnalysisReportExpert(AnalysisReport):
+    four_layer_structure: Optional[str] = None
+    process_obstacle_mapping: Optional[str] = None
+    root_cause_analysis: Optional[str] = None
+    critical_success_factors: Optional[str] = None
+    three_review_assessment: Optional[str] = None
+
+
 class ReportResponse(BaseModel):
     analysis_report: AnalysisReport
     metadata: ReportMetadata
@@ -210,7 +244,7 @@ class ReportResponse(BaseModel):
 
 class ReportExportRequest(BaseModel):
     format: str = Field("markdown", pattern="^(markdown|docx|pdf|json)$")
-    depth: str = Field("standard", pattern="^(brief|standard|deep)$")
+    depth: str = Field("standard", pattern="^(brief|standard|deep|expert)$")
 
 
 # ==================== SSE Event Schemas ====================

@@ -2,15 +2,18 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Plus, MessageSquare, Clock, ChevronRight, Trash2, AlertTriangle,
-  Search, Archive, ArchiveRestore, Loader2, X,
+  Search, Archive, ArchiveRestore, Loader2, X, Play,
 } from 'lucide-react';
 import { interviewApi } from '@/services/api';
+import { useInterview } from '@/hooks/useInterview';
+import { RecordSettingsModal } from '@/components/RecordSettingsModal';
 import { InterviewListSkeleton } from '@/components/Skeleton';
 import { logger } from '@/utils/logger';
 import type { Interview } from '@/types';
 
 const STATUS_TABS = [
   { value: '', label: '全部' },
+  { value: 'blueprint_ready', label: '待开始' },
   { value: 'active', label: '进行中' },
   { value: 'completed', label: '已完成' },
   { value: 'archived', label: '已归档' },
@@ -25,6 +28,12 @@ export function InterviewListPage() {
   const [archivingId, setArchivingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmTheme, setConfirmTheme] = useState('');
+
+  // 开始访谈弹窗状态
+  const [startInterviewId, setStartInterviewId] = useState<string | null>(null);
+  const [isStartingInterview, setIsStartingInterview] = useState(false);
+
+  const { startInterview } = useInterview();
 
   const loadInterviews = useCallback(async () => {
     try {
@@ -70,6 +79,36 @@ export function InterviewListPage() {
     setConfirmTheme('');
   };
 
+  const handleStartInterviewConfirm = async (settings: { enabled: boolean; deviceId: string | null }) => {
+    if (!startInterviewId) return;
+    try {
+      setIsStartingInterview(true);
+      // 保存录音设置
+      localStorage.setItem(
+        'blueprint_record_settings',
+        JSON.stringify({
+          enabled: settings.enabled,
+          deviceId: settings.enabled ? settings.deviceId : null,
+        })
+      );
+      if (settings.enabled && settings.deviceId) {
+        localStorage.setItem('last_mic_device', settings.deviceId);
+      }
+      // 启动访谈（生成开场问题）
+      await startInterview(startInterviewId);
+      // 更新状态为 active
+      await interviewApi.update(startInterviewId, { status: 'active' });
+      // 关闭弹窗并导航
+      setStartInterviewId(null);
+      setIsStartingInterview(false);
+      window.location.href = `/interviews/${startInterviewId}/chat`;
+    } catch (error) {
+      logger.error('开始访谈失败', { error: (error as Error).message });
+      alert('开始访谈失败，请稍后重试');
+      setIsStartingInterview(false);
+    }
+  };
+
   const handleArchive = async (interview: Interview) => {
     const newStatus = interview.status === 'archived' ? 'active' : 'archived';
     try {
@@ -89,12 +128,14 @@ export function InterviewListPage() {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       active: 'bg-blue-100 text-blue-700',
+      blueprint_ready: 'bg-purple-100 text-purple-700',
       completed: 'bg-green-100 text-green-700',
       paused: 'bg-yellow-100 text-yellow-700',
       archived: 'bg-gray-100 text-gray-600',
     };
     const labels: Record<string, string> = {
       active: '进行中',
+      blueprint_ready: '待开始',
       completed: '已完成',
       paused: '已暂停',
       archived: '已归档',
@@ -227,17 +268,32 @@ export function InterviewListPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    to={
-                      interview.status === 'completed'
-                        ? `/interviews/${interview.id}/output`
-                        : `/interviews/${interview.id}/chat`
-                    }
-                    className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
-                  >
-                    {interview.status === 'completed' ? '查看成果' : '进入访谈'}
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Link>
+                  {interview.status === 'blueprint_ready' ? (
+                    <button
+                      onClick={() => setStartInterviewId(interview.id)}
+                      disabled={isStartingInterview}
+                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-purple-600 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors disabled:opacity-50"
+                    >
+                      {isStartingInterview ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                      ) : (
+                        <Play className="w-4 h-4 mr-1" />
+                      )}
+                      开始访谈
+                    </button>
+                  ) : (
+                    <Link
+                      to={
+                        interview.status === 'completed'
+                          ? `/interviews/${interview.id}/output`
+                          : `/interviews/${interview.id}/chat`
+                      }
+                      className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                    >
+                      {interview.status === 'completed' ? '查看成果' : '进入访谈'}
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Link>
+                  )}
                   <button
                     onClick={() => handleArchive(interview)}
                     disabled={archivingId === interview.id}
@@ -266,6 +322,18 @@ export function InterviewListPage() {
           ))}
         </div>
       )}
+
+      {/* Start Interview Modal */}
+      <RecordSettingsModal
+        isOpen={!!startInterviewId}
+        onClose={() => {
+          setStartInterviewId(null);
+          setIsStartingInterview(false);
+        }}
+        onConfirm={handleStartInterviewConfirm}
+        isLoading={isStartingInterview}
+        loadingText="正在启动访谈..."
+      />
 
       {/* Delete Confirm Modal */}
       {confirmId && (

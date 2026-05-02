@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 from typing import List, Optional
@@ -175,6 +176,37 @@ async def confirm_blueprint(
     return {"success": True, "message": "Blueprint confirmed"}
 
 
+@router.post("/{interview_id}/blueprint/save")
+async def save_blueprint(
+    interview_id: str,
+    request: BlueprintConfirmRequest,
+    service: InterviewService = Depends(get_interview_service),
+    current_user: Optional[User] = Depends(get_current_active_user_optional),
+):
+    """保存蓝图：确认蓝图内容并将访谈状态设为待开始（blueprint_ready）"""
+    from app.models.interview import InterviewStatus
+
+    user_id = resolve_user_filter(current_user)
+    interview = await service.get_interview(interview_id, user_id=user_id)
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+
+    # 如果有调整，更新蓝图
+    if request.adjustments:
+        await service.update_interview(
+            interview_id,
+            InterviewUpdate(blueprint={**interview.blueprint, **request.adjustments})
+        )
+
+    # 将访谈状态设为待开始
+    await service.update_interview(
+        interview_id,
+        InterviewUpdate(status=InterviewStatus.BLUEPRINT_READY)
+    )
+
+    return {"success": True, "status": "blueprint_ready", "message": "Blueprint saved"}
+
+
 # ==================== Interview Start ====================
 
 @router.post("/{interview_id}/start", response_model=MessageResponse)
@@ -219,7 +251,15 @@ async def send_message(
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
-    
+
+    # 完成态守卫：访谈已结束时禁止再发消息，引导前端走 /resume 或 /complete
+    from app.models.interview import InterviewState
+    if interview.current_state == InterviewState.COMPLETED:
+        raise HTTPException(
+            status_code=409,
+            detail="Interview already completed; call /resume to continue or /complete to finalize",
+        )
+
     response = await service.generate_ai_response(interview_id, data.content)
     
     # 返回最后一条AI消息（按时间降序取最新）
@@ -281,7 +321,14 @@ async def send_message_stream(
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
-    
+
+    from app.models.interview import InterviewState
+    if interview.current_state == InterviewState.COMPLETED:
+        raise HTTPException(
+            status_code=409,
+            detail="Interview already completed; call /resume to continue or /complete to finalize",
+        )
+
     async def event_generator():
         async for chunk in service.generate_ai_response_stream(interview_id, data.content):
             yield f"data: {chunk}\n\n"
@@ -324,9 +371,31 @@ async def complete_interview(
     interview = await service.get_interview(interview_id, user_id=user_id)
     if not interview:
         raise HTTPException(status_code=404, detail="Interview not found")
-    
+
     final_output = await service.complete_interview(interview_id)
     return {"output": final_output}
+
+
+@router.post("/{interview_id}/resume", response_model=InterviewResponse)
+async def resume_interview(
+    interview_id: str,
+    service: InterviewService = Depends(get_interview_service),
+    current_user: Optional[User] = Depends(get_current_active_user_optional),
+):
+    """从已完成状态恢复访谈：current_state 退回 confirmation、status 改回 active。
+
+    用于用户在生成成果前点"继续访谈"，把状态退回有效阶段以便继续追问。
+    """
+    user_id = resolve_user_filter(current_user)
+    interview = await service.get_interview(interview_id, user_id=user_id)
+    if not interview:
+        raise HTTPException(status_code=404, detail="Interview not found")
+
+    try:
+        updated = await service.resume_interview(interview_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return updated
 
 
 @router.get("/{interview_id}/output")
@@ -510,16 +579,16 @@ async def export_output(
     media_types = {
         "markdown": "text/markdown; charset=utf-8",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "pdf": "text/html; charset=utf-8",
+        "pdf": "application/pdf",
         "json": "application/json; charset=utf-8",
     }
-    
+
     if format == "markdown":
         data, filename = ExportService.export_markdown(rendered, filename_base)
     elif format == "docx":
         data, filename = ExportService.export_docx(rendered, interview.theme, filename_base)
     elif format == "pdf":
-        data, filename = ExportService.export_pdf(rendered, interview.theme, filename_base)
+        data, filename = await asyncio.to_thread(ExportService.export_pdf, rendered, interview.theme, filename_base)
     elif format == "json":
         data, filename = ExportService.export_json(render_data, filename_base)
     else:
@@ -610,7 +679,7 @@ async def export_report(
     media_types = {
         "markdown": "text/markdown; charset=utf-8",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "pdf": "text/html; charset=utf-8",
+        "pdf": "application/pdf",
         "json": "application/json; charset=utf-8",
     }
 
@@ -619,7 +688,7 @@ async def export_report(
     elif format == "docx":
         data, filename = ExportService.export_docx(markdown_content, interview.theme, filename_base)
     elif format == "pdf":
-        data, filename = ExportService.export_pdf(markdown_content, interview.theme, filename_base)
+        data, filename = await asyncio.to_thread(ExportService.export_pdf, markdown_content, interview.theme, filename_base)
     elif format == "json":
         data, filename = ExportService.export_json(report, filename_base)
     else:

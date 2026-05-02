@@ -206,6 +206,21 @@ export function useInterview() {
     }
   }, []);
 
+  const resumeInterview = useCallback(async (id: string) => {
+    store.setIsLoading(true);
+    store.setError(null);
+    try {
+      const response = await interviewApi.resume(id);
+      store.setCurrentInterview(response.data);
+      return response.data;
+    } catch (error: any) {
+      store.setError(error.response?.data?.detail || '继续访谈失败');
+      throw error;
+    } finally {
+      store.setIsLoading(false);
+    }
+  }, []);
+
   // ==================== Timer ====================
 
   const startTimer = useCallback(async (id: string) => {
@@ -319,6 +334,7 @@ export function useInterview() {
     sendMessage,
     sendMessageStream,
     completeInterview,
+    resumeInterview,
     loadExpertProfile,
     loadLatestAnalysis,
     startTimer,

@@ -49,7 +49,30 @@ class LLMService:
     def _get_mock_json_response(self, system_prompt: str) -> Dict[str, Any]:
         """根据系统提示词类型返回模拟JSON响应"""
         prompt_lower = system_prompt.lower()
-        if "blueprint" in prompt_lower or "蓝图" in system_prompt:
+        # 注意：访谈轮次的 system_prompt 同时包含"蓝图指导"片段和"提问/问题"关键字，
+        # 因此 question 分支必须排在 blueprint 之前，否则会被误派到 blueprint mock，
+        # 进而触发 interview_service 中 "请继续分享您的经验。" 兜底字符串。
+        if "question" in prompt_lower or "问题" in system_prompt or "提问" in system_prompt:
+            return {
+                "question": {
+                    "type": "探索性",
+                    "content": "您提到当时客户对价格有异议，能否详细描述一下客户当时具体说了什么？您的第一反应是什么？",
+                    "purpose": "深入挖掘专家面对异议时的真实思考过程和关键动作",
+                    "value_dimension": "木（有难度）",
+                },
+                "structured_update": {
+                    "event_description": "客户因价格高于竞品而犹豫",
+                    "key_actions": ["倾听客户诉求", "不急于反驳"],
+                },
+                "thinking": "专家已初步描述场景，需要进一步追问具体细节",
+                "state_assessment": {
+                    "current_step": "复盘事件",
+                    "step_progress": "30%",
+                    "should_advance": True,
+                    "information_gaps": ["客户具体异议内容", "专家的第一反应细节"],
+                },
+            }
+        elif "blueprint" in prompt_lower or "蓝图" in system_prompt:
             return {
                 "blueprint": {
                     "objective": "萃取资深销售在客户异议处理方面的核心经验，形成标准化打法",
@@ -73,26 +96,6 @@ class LLMService:
                     ],
                     "risk_notes": ["避免空泛理论，聚焦具体案例", "关注客户心理变化过程"],
                 }
-            }
-        elif "question" in prompt_lower or "问题" in system_prompt or "提问" in system_prompt:
-            return {
-                "question": {
-                    "type": "探索性",
-                    "content": "您提到当时客户对价格有异议，能否详细描述一下客户当时具体说了什么？您的第一反应是什么？",
-                    "purpose": "深入挖掘专家面对异议时的真实思考过程和关键动作",
-                    "value_dimension": "木（有难度）",
-                },
-                "structured_update": {
-                    "event_description": "客户因价格高于竞品而犹豫",
-                    "key_actions": ["倾听客户诉求", "不急于反驳"],
-                },
-                "thinking": "专家已初步描述场景，需要进一步追问具体细节",
-                "state_assessment": {
-                    "current_step": "复盘事件",
-                    "step_progress": "30%",
-                    "should_advance": True,
-                    "information_gaps": ["客户具体异议内容", "专家的第一反应细节"],
-                },
             }
         elif "extract" in prompt_lower or "萃取" in system_prompt or "结构化" in system_prompt:
             return {
@@ -280,7 +283,7 @@ class LLMService:
         system_prompt: str,
         messages: list[dict],
         temperature: float = 0.3,
-        max_tokens: int = 2000,
+        max_tokens: int = 10000,
     ) -> Dict[str, Any]:
         """生成结构化JSON输出（支持确定性调用缓存）"""
         start_time = time.time()

@@ -15,10 +15,27 @@ export function InterviewCreatePage() {
     expected_duration: 30,
     target_output_format: ['comprehensive'] as string[],
   });
+  const [themeError, setThemeError] = useState('');
+
+  const handleThemeChange = (value: string) => {
+    setFormData({ ...formData, theme: value });
+    if (value.trim() && value.trim().length < 5) {
+      setThemeError('主题至少需要5个字符');
+    } else {
+      setThemeError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.theme.trim()) return;
+    if (!formData.theme.trim()) {
+      setThemeError('请输入萃取主题');
+      return;
+    }
+    if (formData.theme.trim().length < 5) {
+      setThemeError('主题至少需要5个字符');
+      return;
+    }
 
     try {
       const interview = await createInterview(formData);
@@ -58,14 +75,20 @@ export function InterviewCreatePage() {
             <input
               type="text"
               value={formData.theme}
-              onChange={(e) => setFormData({ ...formData, theme: e.target.value })}
+              onChange={(e) => handleThemeChange(e.target.value)}
               placeholder="例如：新任销售代表的异议处理技巧"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                themeError ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'
+              }`}
               required
             />
-            <p className="text-sm text-gray-500 mt-1">
-              明确您想要萃取的经验主题
-            </p>
+            {themeError ? (
+              <p className="text-sm text-red-500 mt-1">{themeError}</p>
+            ) : (
+              <p className="text-sm text-gray-500 mt-1">
+                明确您想要萃取的经验主题（至少5个字符）
+              </p>
+            )}
           </div>
 
           {/* 业务背景 */}

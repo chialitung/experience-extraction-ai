@@ -17,6 +17,7 @@ class InterviewState(str, PyEnum):
 
 class InterviewStatus(str, PyEnum):
     ACTIVE = "active"
+    BLUEPRINT_READY = "blueprint_ready"
     PAUSED = "paused"
     COMPLETED = "completed"
     ARCHIVED = "archived"
@@ -101,6 +102,11 @@ class StructuredContent(Base):
     tools = Column(JSON, default=list)
     risks = Column(JSON, default=list)
     decisions = Column(JSON, default=list)
+
+    # 专家版高阶萃取数据
+    scenario_variables = Column(JSON, default=list)
+    success_factors = Column(JSON, default=list)
+    root_cause_chains = Column(JSON, default=list)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

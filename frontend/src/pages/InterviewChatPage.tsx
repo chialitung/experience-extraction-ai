@@ -16,7 +16,7 @@ export function InterviewChatPage() {
   const {
     currentInterview, messages, structuredContent, isLoading, isStreaming,
     expertProfile, latestAnalysis, error: interviewError,
-    loadInterview, startInterview, sendMessage, completeInterview,
+    loadInterview, startInterview, sendMessage, completeInterview, resumeInterview,
     loadExpertProfile, loadLatestAnalysis,
     timing, recording,
     startTimer, pauseTimer, resumeTimer, getTimerStatus,
@@ -28,6 +28,8 @@ export function InterviewChatPage() {
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [isResuming, setIsResuming] = useState(false);
   const [localStructured, setLocalStructured] = useState<StructuredContent>({
     steps: [], principles: [], tools: [], risks: [], decisions: [],
   });
@@ -51,6 +53,18 @@ export function InterviewChatPage() {
 
   // 实时语音识别预览（MID_TEXT 中间结果）
   const [realtimePreview, setRealtimePreview] = useState('');
+
+  // 是否存在尚未提交的轮次内容（已转录文本或备注）
+  // 与 recording.isActive 解耦：录音关闭后，已转录文字仍应保留并允许提交
+  const hasPendingRound =
+    currentRound.transcription.trim().length > 0 || currentRound.notes.length > 0;
+
+  // 录音关闭时，清空尚未确认的实时预览（MID_TEXT 是未定型结果，停录即作废）
+  useEffect(() => {
+    if (!recording.isActive) {
+      setRealtimePreview('');
+    }
+  }, [recording.isActive]);
 
   // 实时语音识别 Hook
   const handleRealtimeResult = useCallback((type: 'MID_TEXT' | 'FIN_TEXT', text: string) => {
@@ -139,6 +153,21 @@ export function InterviewChatPage() {
     };
   }, [timing.status, setTiming]);
 
+  // 完成态守门：state 推进到 completed 但尚未生成最终成果时，本地暂停计时
+  // 让用户停留在选择"完成访谈"或"继续访谈"的关口，时间冻结
+  const hasFinalOutput = !!(
+    currentInterview?.final_output &&
+    Object.keys(currentInterview.final_output).length > 0
+  );
+  const isCompletedGate =
+    currentInterview?.current_state === 'completed' && !hasFinalOutput;
+
+  useEffect(() => {
+    if (isCompletedGate && timing.status === 'running') {
+      setTiming({ status: 'paused' });
+    }
+  }, [isCompletedGate, timing.status, setTiming]);
+
   useEffect(() => {
     if (id) {
       loadInterview(id);
@@ -216,8 +245,8 @@ export function InterviewChatPage() {
     setInput('');
     setSendError(null);
 
-    // 录音模式：发送的是备注，追加到当前轮次
-    if (recording.isActive) {
+    // 录音中或存在未提交轮次草稿时：输入作为备注追加到当前轮次
+    if (recording.isActive || hasPendingRound) {
       setCurrentRound((prev) => ({
         ...prev,
         notes: [...prev.notes, content],
@@ -241,11 +270,13 @@ export function InterviewChatPage() {
 
     setIsCompletingRound(true);
     setSendError(null);
+    setRecording({ isActive: false });
 
     try {
       await completeRound(id, currentRound.transcription, currentRound.notes);
       // 成功后清空当前轮次
       setCurrentRound({ transcription: '', notes: [] });
+      setRecording({ isActive: true });
     } catch (error: any) {
       logger.error('进入下一轮失败', { error: error?.message });
       const detail = error?.response?.data?.detail;
@@ -265,14 +296,34 @@ export function InterviewChatPage() {
 
   const handleComplete = async () => {
     if (!id || isCompleting) return;
+    setCompleteError(null);
     setIsCompleting(true);
     try {
       await completeInterview(id);
       navigate(`/interviews/${id}/output`);
-    } catch (error) {
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || error?.message || '生成成果失败，请重试';
+      setCompleteError(msg);
       logger.error('完成访谈失败', { error: (error as Error).message });
     } finally {
       setIsCompleting(false);
+    }
+  };
+
+  const handleResume = async () => {
+    if (!id || isResuming) return;
+    setSendError(null);
+    setIsResuming(true);
+    try {
+      await resumeInterview(id);
+      // 状态变回 active，恢复本地计时
+      setTiming({ status: 'running' });
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || error?.message || '继续访谈失败';
+      setSendError(msg);
+      logger.error('继续访谈失败', { error: (error as Error).message });
+    } finally {
+      setIsResuming(false);
     }
   };
 
@@ -457,23 +508,25 @@ export function InterviewChatPage() {
               )}
 
               {/* 完成访谈 */}
-              <button
-                onClick={handleComplete}
-                disabled={isLoading || isStreaming || isCompleting || currentInterview?.current_state === 'completed'}
-                className="px-4 py-2 bg-success-500 text-white rounded-lg hover:bg-success-600 disabled:opacity-50 text-sm font-medium flex items-center"
-              >
-                {isCompleting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    正在生成成果...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    完成访谈
-                  </>
-                )}
-              </button>
+              {!isCompletedGate && (
+                <button
+                  onClick={handleComplete}
+                  disabled={isLoading || isStreaming || isCompleting}
+                  className="px-4 py-2 bg-success-500 text-white rounded-lg hover:bg-success-600 disabled:opacity-50 text-sm font-medium flex items-center"
+                >
+                  {isCompleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      正在生成成果...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      完成访谈
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
           
@@ -600,8 +653,8 @@ export function InterviewChatPage() {
             </div>
           ))}
           
-          {/* 当前轮次草稿（录音模式下） */}
-          {recording.isActive && (currentRound.transcription || currentRound.notes.length > 0 || realtimePreview) && (
+          {/* 当前轮次草稿（录音中或有未提交内容时显示） */}
+          {(hasPendingRound || (recording.isActive && realtimePreview)) && (
             <div className="flex justify-end">
               <div className="flex flex-row-reverse max-w-3xl">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-primary-100 ml-3">
@@ -696,106 +749,153 @@ export function InterviewChatPage() {
 
         {/* Input */}
         <div className="bg-white border-t border-gray-200 px-6 py-4">
-          {/* 录音模式：下一轮按钮（在波形图上方） */}
-          {recording.isActive && (
-            <div className="mb-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {(currentRound.transcription || realtimePreview) && (
-                  <span className="text-xs text-gray-500">
-                    当前轮次已转录 {currentRound.transcription.length} 字
-                    {realtimePreview && '，识别中...'}
-                    {currentRound.notes.length > 0 && `，${currentRound.notes.length} 条备注`}
-                  </span>
-                )}
+          {isCompletedGate ? (
+            <div className="flex flex-col items-center gap-3 py-2">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <CheckCircle className="w-4 h-4 text-success-500" />
+                <span>访谈已收尾，请选择下一步：生成成果材料，或继续补充访谈内容。</span>
               </div>
-              <button
-                onClick={handleNextRound}
-                disabled={
-                  isLoading ||
-                  isStreaming ||
-                  isCompletingRound ||
-                  (!currentRound.transcription.trim() && currentRound.notes.length === 0)
-                }
-                className="px-4 py-1.5 bg-success-500 text-white text-sm rounded-lg hover:bg-success-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
-              >
-                {isCompletingRound ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    整理中...
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                    下一轮
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleResume}
+                  disabled={isResuming || isCompleting}
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-1.5"
+                >
+                  {isResuming ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      切换中...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowLeft className="w-4 h-4" />
+                      继续访谈
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleComplete}
+                  disabled={isCompleting || isResuming}
+                  className="px-5 py-2.5 bg-success-500 text-white rounded-lg hover:bg-success-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center gap-1.5"
+                >
+                  {isCompleting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      正在生成成果...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      完成访谈
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {/* 录音中或有未提交内容时：下一轮按钮 */}
+              {(recording.isActive || hasPendingRound) && (
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {(currentRound.transcription || realtimePreview) && (
+                      <span className="text-xs text-gray-500">
+                        当前轮次已转录 {currentRound.transcription.length} 字
+                        {realtimePreview && '，识别中...'}
+                        {currentRound.notes.length > 0 && `，${currentRound.notes.length} 条备注`}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleNextRound}
+                    disabled={
+                      isLoading ||
+                      isStreaming ||
+                      isCompletingRound ||
+                      (!currentRound.transcription.trim() && currentRound.notes.length === 0)
+                    }
+                    className="px-4 py-1.5 bg-success-500 text-white text-sm rounded-lg hover:bg-success-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                  >
+                    {isCompletingRound ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        整理中...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                        下一轮
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
 
-          {/* 音频波形 + 状态提示 */}
-          <div className="mb-2">
-            <AudioWaveform
-              analyser={voiceRecorder.analyser}
-              isRecording={voiceRecorder.isRecording}
-              hasError={voiceRecorder.hasError}
-              height={32}
-              barCount={32}
-            />
-            <div className="flex items-center gap-3 mt-1 min-h-[16px]">
-              {realtimeTranscription.isConnecting && (
-                <span className="text-xs text-primary-600 flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  正在连接实时语音识别...
-                </span>
-              )}
-              {realtimeTranscription.isConnected && (
-                <span className="text-xs text-green-600 flex items-center gap-1">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                  </span>
-                  实时语音识别已连接
-                </span>
-              )}
-              {voiceRecorder.permissionState === 'denied' && (
-                <span className="text-xs text-red-500">麦克风权限被拒绝，请检查浏览器设置</span>
-              )}
-              {!voiceRecorder.isSupported && (
-                <span className="text-xs text-gray-400">当前浏览器不支持录音功能</span>
-              )}
-              {voiceRecorder.hasError && recording.isActive && (
-                <span className="text-xs text-red-500">录音设备异常，请检查麦克风</span>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder={
-                recording.isActive
-                  ? '添加备注信息，补充专家回答的内容...'
-                  : '请输入您的回答，或开启麦克风直接说话...'
-              }
-              rows={2}
-              disabled={isLoading || isStreaming || isCompletingRound}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none disabled:bg-gray-50"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading || isStreaming || isCompletingRound}
-              className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
+              {/* 音频波形 + 状态提示 */}
+              <div className="mb-2">
+                <AudioWaveform
+                  analyser={voiceRecorder.analyser}
+                  isRecording={voiceRecorder.isRecording}
+                  hasError={voiceRecorder.hasError}
+                  height={32}
+                  barCount={32}
+                />
+                <div className="flex items-center gap-3 mt-1 min-h-[16px]">
+                  {realtimeTranscription.isConnecting && (
+                    <span className="text-xs text-primary-600 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      正在连接实时语音识别...
+                    </span>
+                  )}
+                  {realtimeTranscription.isConnected && (
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                      实时语音识别已连接
+                    </span>
+                  )}
+                  {voiceRecorder.permissionState === 'denied' && (
+                    <span className="text-xs text-red-500">麦克风权限被拒绝，请检查浏览器设置</span>
+                  )}
+                  {!voiceRecorder.isSupported && (
+                    <span className="text-xs text-gray-400">当前浏览器不支持录音功能</span>
+                  )}
+                  {voiceRecorder.hasError && recording.isActive && (
+                    <span className="text-xs text-red-500">录音设备异常，请检查麦克风</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder={
+                    recording.isActive || hasPendingRound
+                      ? '添加备注信息，补充专家回答的内容...'
+                      : '请输入您的回答，或开启麦克风直接说话...'
+                  }
+                  rows={2}
+                  disabled={isLoading || isStreaming || isCompletingRound}
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none disabled:bg-gray-50"
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading || isStreaming || isCompletingRound}
+                  className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1046,6 +1146,45 @@ export function InterviewChatPage() {
                 关闭
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Completion Blocking Modal */}
+      {(isCompleting || completeError) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
+            {completeError ? (
+              <div className="px-6 py-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 text-lg">生成成果失败</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-6 whitespace-pre-wrap">{completeError}</p>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setCompleteError(null)}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+                  >
+                    返回
+                  </button>
+                  <button
+                    onClick={handleComplete}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium"
+                  >
+                    重试
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="px-6 py-8 flex flex-col items-center text-center">
+                <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-4" />
+                <h3 className="font-semibold text-gray-900 text-lg mb-2">正在生成访谈成果材料</h3>
+                <p className="text-sm text-gray-600">通常需 20–60 秒，请勿关闭页面</p>
+              </div>
+            )}
           </div>
         </div>
       )}

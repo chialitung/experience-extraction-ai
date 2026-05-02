@@ -41,11 +41,11 @@ async def login(
     service: AuthService = Depends(get_auth_service),
 ):
     """用户登录"""
-    user = await service.authenticate(data)
+    user, error_msg = await service.authenticate(data)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail=error_msg or "登录失败，请重试",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token = service.create_access_token_for_user(user)

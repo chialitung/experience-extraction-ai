@@ -658,10 +658,8 @@ export function OutputPage() {
             {/* 导出格式按钮 */}
             <div className="flex gap-1.5">
               {[
-                { key: 'markdown', label: 'MD', icon: FileCode },
                 { key: 'docx', label: 'Word', icon: FileSpreadsheet },
                 { key: 'pdf', label: 'PDF', icon: FileText },
-                { key: 'json', label: 'JSON', icon: FileCode },
               ].map((fmt) => (
                 <button
                   key={fmt.key}

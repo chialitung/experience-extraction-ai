@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Clock, Target, Sparkles, Mic, MicOff, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Clock, Target, Sparkles, Save, X } from 'lucide-react';
 import { useInterview } from '@/hooks/useInterview';
 import { interviewApi } from '@/services/api';
+import { RecordSettingsModal } from '@/components/RecordSettingsModal';
 import { logger } from '@/utils/logger';
 import type { Blueprint } from '@/types';
 
@@ -12,14 +13,14 @@ export function BlueprintPage() {
   const { generateBlueprint, isLoading } = useInterview();
   const [blueprint, setBlueprint] = useState<Blueprint | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false);
   const generateInitiatedRef = useRef(false);
 
   // 录音确认弹窗状态
   const [showRecordModal, setShowRecordModal] = useState(false);
-  const [recordEnabled, setRecordEnabled] = useState(true);
-  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDevice, setSelectedDevice] = useState('');
-  const [deviceLoading, setDeviceLoading] = useState(false);
+
+  // 保存蓝图提示
+  const [saveToast, setSaveToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -39,6 +40,8 @@ export function BlueprintPage() {
       }
     } catch (error) {
       logger.error('加载蓝图失败', { error: (error as Error).message });
+    } finally {
+      setHasAttemptedLoad(true);
     }
   };
 
@@ -51,46 +54,18 @@ export function BlueprintPage() {
       setBlueprint(bp);
     } catch (error) {
       logger.error('生成蓝图失败', { error: (error as Error).message });
-      // 失败后允许重试
-      generateInitiatedRef.current = false;
     } finally {
+      generateInitiatedRef.current = false;
       setGenerating(false);
     }
   };
 
   const handleConfirm = async () => {
     if (!id) return;
-    // 枚举设备并打开录音确认弹窗
-    setDeviceLoading(true);
     setShowRecordModal(true);
-    try {
-      if (navigator.mediaDevices?.enumerateDevices) {
-        // 先请求权限以获取带 label 的设备列表
-        try {
-          const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          tempStream.getTracks().forEach((t) => t.stop());
-        } catch {
-          // 权限被拒绝，仍然尝试枚举（可能获得空label设备）
-        }
-        const allDevices = await navigator.mediaDevices.enumerateDevices();
-        const inputs = allDevices.filter((d) => d.kind === 'audioinput');
-        setAudioDevices(inputs);
-        // 默认选中上次使用的设备或第一个
-        const lastDevice = localStorage.getItem('last_mic_device');
-        if (lastDevice && inputs.some((d) => d.deviceId === lastDevice)) {
-          setSelectedDevice(lastDevice);
-        } else if (inputs.length > 0) {
-          setSelectedDevice(inputs[0].deviceId);
-        }
-      }
-    } catch (err) {
-      logger.error('枚举录音设备失败', { error: (err as Error).message });
-    } finally {
-      setDeviceLoading(false);
-    }
   };
 
-  const handleStartInterview = async () => {
+  const handleStartInterview = async (settings: { enabled: boolean; deviceId: string | null }) => {
     if (!id) return;
     try {
       await interviewApi.confirmBlueprint(id);
@@ -98,12 +73,12 @@ export function BlueprintPage() {
       localStorage.setItem(
         'blueprint_record_settings',
         JSON.stringify({
-          enabled: recordEnabled,
-          deviceId: recordEnabled ? selectedDevice : null,
+          enabled: settings.enabled,
+          deviceId: settings.enabled ? settings.deviceId : null,
         })
       );
-      if (recordEnabled && selectedDevice) {
-        localStorage.setItem('last_mic_device', selectedDevice);
+      if (settings.enabled && settings.deviceId) {
+        localStorage.setItem('last_mic_device', settings.deviceId);
       }
       navigate(`/interviews/${id}/chat`);
     } catch (error) {
@@ -111,7 +86,23 @@ export function BlueprintPage() {
     }
   };
 
-  if (generating || isLoading) {
+  const handleSaveBlueprint = async () => {
+    if (!id) return;
+    try {
+      await interviewApi.saveBlueprint(id);
+      setSaveToast({ message: '蓝图已保存', type: 'success' });
+      setTimeout(() => {
+        setSaveToast(null);
+        navigate('/interviews');
+      }, 1500);
+    } catch (error) {
+      logger.error('保存蓝图失败', { error: (error as Error).message });
+      setSaveToast({ message: '保存失败，请稍后重试', type: 'error' });
+      setTimeout(() => setSaveToast(null), 3000);
+    }
+  };
+
+  if (!hasAttemptedLoad || generating || isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -264,6 +255,13 @@ export function BlueprintPage() {
             确认蓝图并开始访谈
           </button>
           <button
+            onClick={handleSaveBlueprint}
+            className="px-6 py-3 border border-primary-600 text-primary-600 rounded-lg hover:bg-primary-50 transition-colors flex items-center"
+          >
+            <Save className="w-5 h-5 mr-2" />
+            保存蓝图
+          </button>
+          <button
             onClick={handleGenerate}
             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
@@ -272,96 +270,51 @@ export function BlueprintPage() {
         </div>
       </div>
 
-      {/* 录音确认弹窗 */}
-      {showRecordModal && (
-        <>
-          {/* 遮罩层：仅负责背景，不拦截任何点击事件 */}
-          <div className="fixed inset-0 z-50 bg-black/50 pointer-events-none" />
-          {/* 弹窗内容层 */}
-          <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden pointer-events-auto">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">录音设置</h3>
-              <button
-                onClick={() => setShowRecordModal(false)}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* 保存蓝图提示 */}
+      {saveToast && (
+        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-50">
+          <div
+            className={`flex items-center gap-5 pl-3 pr-8 py-6 rounded-2xl shadow-2xl border min-w-[400px] animate-[slideDown_0.3s_ease-out] ${
+              saveToast.type === 'success'
+                ? 'bg-white border-green-200 shadow-green-100/50'
+                : 'bg-white border-red-200 shadow-red-100/50'
+            }`}
+          >
+            <div
+              className={`flex items-center justify-center w-14 h-14 rounded-full shrink-0 ${
+                saveToast.type === 'success' ? 'bg-green-100' : 'bg-red-100'
+              }`}
+            >
+              <CheckCircle
+                className={`w-7 h-7 ${
+                  saveToast.type === 'success' ? 'text-green-600' : 'text-red-600'
+                }`}
+              />
             </div>
-
-            {/* Body */}
-            <div className="px-6 py-5 space-y-5">
-              {/* 启用录音开关 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${recordEnabled ? 'bg-red-100' : 'bg-gray-100'}`}>
-                    {recordEnabled ? <Mic className="w-5 h-5 text-red-600" /> : <MicOff className="w-5 h-5 text-gray-500" />}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">启用语音录制</p>
-                    <p className="text-sm text-gray-500">
-                      {recordEnabled ? '访谈中将自动录音并转录文字' : '仅使用文字输入，可在访谈中随时开启'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setRecordEnabled(!recordEnabled)}
-                  className={`relative w-12 h-7 rounded-full transition-colors ${recordEnabled ? 'bg-primary-600' : 'bg-gray-300'}`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${recordEnabled ? 'translate-x-5' : ''}`}
-                  />
-                </button>
-              </div>
-
-              {/* 设备选择 */}
-              {recordEnabled && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    选择录音设备
-                  </label>
-                  {deviceLoading ? (
-                    <div className="text-sm text-gray-400 py-2">正在检测设备...</div>
-                  ) : audioDevices.length === 0 ? (
-                    <div className="text-sm text-orange-600 py-2">未检测到麦克风设备，请确保麦克风已连接并授权</div>
-                  ) : (
-                    <select
-                      value={selectedDevice}
-                      onChange={(e) => setSelectedDevice(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                    >
-                      {audioDevices.map((d) => (
-                        <option key={d.deviceId} value={d.deviceId}>
-                          {d.label || `麦克风 ${d.deviceId.slice(0, 8)}...`}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
+            <div className="flex-1">
+              <p className="text-lg font-bold text-gray-900">{saveToast.message}</p>
+              <p className="text-base text-gray-500 mt-1">
+                {saveToast.type === 'success' ? '正在跳转至访谈列表...' : '请检查网络后重试'}
+              </p>
             </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-              <button
-                onClick={() => setShowRecordModal(false)}
-                className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleStartInterview}
-                className="flex-1 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
-              >
-                开始访谈
-              </button>
-            </div>
+            <button
+              onClick={() => setSaveToast(null)}
+              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0 p-1"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </div>
         </div>
-      </>
       )}
+
+      <RecordSettingsModal
+        isOpen={showRecordModal}
+        onClose={() => setShowRecordModal(false)}
+        onConfirm={(settings) => {
+          setShowRecordModal(false);
+          handleStartInterview(settings);
+        }}
+      />
     </div>
   );
 }

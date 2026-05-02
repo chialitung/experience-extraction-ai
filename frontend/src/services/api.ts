@@ -56,10 +56,15 @@ api.interceptors.response.use(
     const statusText = error.response?.statusText;
 
     if (status === 401 && !SKIP_AUTH) {
-      logger.warn('API 401 Unauthorized, redirecting to login', { requestId, url: config?.url });
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // 登录/注册/密码重置等认证端点的 401 是预期错误，不应触发全局登出
+      const authPaths = ['/auth/login', '/auth/register', '/auth/password-reset-request', '/auth/password-reset-confirm'];
+      const isAuthEndpoint = authPaths.some(path => config?.url?.includes(path));
+      if (!isAuthEndpoint) {
+        logger.warn('API 401 Unauthorized, redirecting to login', { requestId, url: config?.url });
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     } else if (status === 429) {
       logger.error('API 429 Too Many Requests', {
         requestId,
@@ -127,6 +132,9 @@ export const interviewApi = {
   confirmBlueprint: (id: string, adjustments?: Record<string, any>) =>
     api.post(`/interviews/${id}/blueprint/confirm`, { adjustments }),
 
+  saveBlueprint: (id: string, adjustments?: Record<string, any>) =>
+    api.post<{ success: boolean; status: string; message: string }>(`/interviews/${id}/blueprint/save`, { adjustments }),
+
   // Messages
   sendMessage: (id: string, content: string) =>
     api.post<Message>(`/interviews/${id}/messages`, { content }),
@@ -158,6 +166,10 @@ export const interviewApi = {
   // Complete & Output
   complete: (id: string) =>
     api.post<{ output: Record<string, any> }>(`/interviews/${id}/complete`),
+
+  // Resume from completed state back to confirmation (for "继续访谈")
+  resume: (id: string) =>
+    api.post<Interview>(`/interviews/${id}/resume`),
 
   getOutput: (id: string, format = 'json') =>
     api.get<{ interview_id: string; content: any; format: string; generated_at: string }>(

@@ -41,17 +41,17 @@ class AuthService:
         await self.db.refresh(user)
         return user
 
-    async def authenticate(self, data: UserLogin) -> Optional[User]:
-        """验证用户登录凭据"""
+    async def authenticate(self, data: UserLogin) -> tuple[Optional[User], Optional[str]]:
+        """验证用户登录凭据，返回 (user, error_msg)"""
         result = await self.db.execute(select(User).where(User.email == data.email))
         user = result.scalar_one_or_none()
         if not user:
-            return None
+            return None, "账号不存在，请检查邮箱或注册新账号"
         if not verify_password(data.password, user.hashed_password):
-            return None
+            return None, "密码错误，请重新输入"
         if not user.is_active:
-            return None
-        return user
+            return None, "账号已被禁用，请联系管理员"
+        return user, None
 
     async def get_user_by_id(self, user_id: str) -> Optional[User]:
         """通过ID获取用户"""

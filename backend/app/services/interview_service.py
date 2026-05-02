@@ -645,6 +645,22 @@ class InterviewService:
 - 针对用户回答中的关键信息进行追问，挖掘细节、动作、话术、工具、决策逻辑。
 - 如果用户回答跑题或过于空泛，请礼貌地引导其回到具体案例和动作细节。"""
 
+        # 专家版高阶采集：在 confirmation 阶段第2轮及以后追加
+        if current_state == InterviewState.CONFIRMATION and turns >= 2:
+            system_prompt += """
+
+## 高阶萃取采集（专家版报告所需）
+在确认核心内容准确性后，请进一步向专家确认以下内容（每轮问1-2个问题，不要一次性问太多）：
+1. 【场景变量】这个方法在哪些不同场景下需要调整？（如客户类型、预算规模、决策阶段、团队规模等差异）每个场景下的关键变量是什么？
+2. 【关键成功因素】如果只能保留3个最关键的成功因素，专家会选择哪3个？请为每个因素按金木水火土五维评分（1-10分）。
+3. 【根因追溯】对于已识别的每个主要风险/障碍，请连续追问"为什么会发生"，记录完整的根因链（至少3层，最多5层）。
+
+你的回复中 structured_update 字段除了常规的 steps/principles/tools/risks 外，还需根据本轮确认的内容包含以下字段之一或多项：
+- scenario_variables: [{"scenario": "场景名称", "variables": ["变量1", "变量2"], "adaptation": "适配策略"}]
+- success_factors: [{"factor": "因素名称", "gold": 评分, "wood": 评分, "water": 评分, "fire": 评分, "earth": 评分, "priority": 优先级数字}]
+- root_cause_chains: [{"risk_id": "风险标识", "risk_description": "风险描述", "chain": ["表面现象", "直接原因", "间接原因", "深层原因", "根因"], "prevention": "预防措施"}]
+"""
+
         # 获取历史消息并进行智能截断/摘要（防止长对话导致上下文爆炸和重复提问）
         messages_history = await self.get_messages(interview_id, limit=100)
         messages = []
@@ -1350,6 +1366,22 @@ class InterviewService:
 - 针对用户回答中的关键信息进行追问，挖掘细节、动作、话术、工具、决策逻辑。
 - 如果用户回答跑题或过于空泛，请礼貌地引导其回到具体案例和动作细节。"""
 
+        # 专家版高阶采集：在 confirmation 阶段第2轮及以后追加
+        if current_state == InterviewState.CONFIRMATION and turns >= 2:
+            system_prompt += """
+
+## 高阶萃取采集（专家版报告所需）
+在确认核心内容准确性后，请进一步向专家确认以下内容（每轮问1-2个问题，不要一次性问太多）：
+1. 【场景变量】这个方法在哪些不同场景下需要调整？（如客户类型、预算规模、决策阶段、团队规模等差异）每个场景下的关键变量是什么？
+2. 【关键成功因素】如果只能保留3个最关键的成功因素，专家会选择哪3个？请为每个因素按金木水火土五维评分（1-10分）。
+3. 【根因追溯】对于已识别的每个主要风险/障碍，请连续追问"为什么会发生"，记录完整的根因链（至少3层，最多5层）。
+
+你的回复中 structured_update 字段除了常规的 steps/principles/tools/risks 外，还需根据本轮确认的内容包含以下字段之一或多项：
+- scenario_variables: [{"scenario": "场景名称", "variables": ["变量1", "变量2"], "adaptation": "适配策略"}]
+- success_factors: [{"factor": "因素名称", "gold": 评分, "wood": 评分, "water": 评分, "fire": 评分, "earth": 评分, "priority": 优先级数字}]
+- root_cause_chains: [{"risk_id": "风险标识", "risk_description": "风险描述", "chain": ["表面现象", "直接原因", "间接原因", "深层原因", "根因"], "prevention": "预防措施"}]
+"""
+
         # 获取历史消息并进行智能截断/摘要（防止长对话导致上下文爆炸和重复提问）
         messages_history = await self.get_messages(interview_id, limit=100)
         messages = []
@@ -1939,6 +1971,56 @@ class InterviewService:
         )
         return final_output
 
+    async def resume_interview(self, interview_id: UUID) -> Interview:
+        """从 completed 状态恢复访谈：current_state 退回 confirmation、status 改回 active，
+        并往 state_history 追加 action="resumed" 条目。"""
+        from sqlalchemy import update as sa_update
+
+        stmt = select(Interview).where(Interview.id == interview_id)
+        result = await self.db.execute(stmt)
+        interview = result.scalar_one_or_none()
+        if not interview:
+            raise ValueError("Interview not found")
+
+        old_state = interview.current_state.value if interview.current_state else None
+        history = list(interview.state_history or [])
+        history.append({
+            "action": "resumed",
+            "from": old_state,
+            "to": InterviewState.CONFIRMATION.value,
+            "transitioned_at": datetime.utcnow().isoformat(),
+        })
+
+        await self.db.execute(
+            sa_update(Interview)
+            .where(Interview.id == interview_id)
+            .values(
+                current_state=InterviewState.CONFIRMATION,
+                status=InterviewStatus.ACTIVE,
+                state_history=history,
+                updated_at=datetime.utcnow(),
+            )
+        )
+        await self.db.flush()
+
+        await interview_cache.invalidate_prefix(f"interview:{interview_id}")
+        await structured_content_cache.delete(f"structured:{interview_id}")
+
+        # 重新读取以返回最新状态
+        result = await self.db.execute(select(Interview).where(Interview.id == interview_id))
+        updated = result.scalar_one_or_none()
+
+        self.logger.info(
+            f"Interview resumed: {interview_id}",
+            extra={
+                "interview_id": str(interview_id),
+                "from_state": old_state,
+                "to_state": InterviewState.CONFIRMATION.value,
+                "event": "interview_resumed",
+            },
+        )
+        return updated
+
     def _normalize_final_output(self, raw_output: Dict[str, Any], formats_to_generate: List[str], structured: Dict[str, Any]) -> Dict[str, Any]:
         """规范化最终输出格式，适配LLM可能返回的各种格式"""
         # 情况1: 已经是正确的嵌套格式
@@ -2156,7 +2238,8 @@ class InterviewService:
         
         if existing:
             # 合并更新
-            for key in ["steps", "principles", "tools", "risks", "decisions"]:
+            for key in ["steps", "principles", "tools", "risks", "decisions",
+                        "scenario_variables", "success_factors", "root_cause_chains"]:
                 if key in updates and updates[key]:
                     current = getattr(existing, key) or []
                     current.extend(updates[key])
@@ -2171,6 +2254,9 @@ class InterviewService:
                 tools=updates.get("tools", []),
                 risks=updates.get("risks", []),
                 decisions=updates.get("decisions", []),
+                scenario_variables=updates.get("scenario_variables", []),
+                success_factors=updates.get("success_factors", []),
+                root_cause_chains=updates.get("root_cause_chains", []),
             )
             self.db.add(structured)
         

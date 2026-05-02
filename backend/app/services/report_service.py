@@ -61,6 +61,28 @@ class ReportService:
                 "references",
             ],
         },
+        "expert": {
+            "name": "专家版",
+            "word_target": "6000-10000字",
+            "description": "完整方法论分析，含头-身-足-包四层结构、萃取层级标识、场景适配、根因链分析",
+            "sections_required": [
+                "executive_summary",
+                "case_background",
+                "four_layer_structure",
+                "methodology_framework",
+                "key_steps_analysis",
+                "decision_logic_analysis",
+                "process_obstacle_mapping",
+                "root_cause_analysis",
+                "tools_and_scripts",
+                "application_guidance",
+                "critical_success_factors",
+                "value_assessment",
+                "lessons_learned",
+                "references",
+                "three_review_assessment",
+            ],
+        },
     }
 
     def __init__(self):
@@ -182,8 +204,66 @@ class ReportService:
 6. 所有内容必须基于访谈实际数据，不得编造
 7. 字数严格控制在 {config['word_target']} 范围内
 8. 输出必须是合法JSON，所有字符串值必须使用双引号
+{self._build_expert_instructions(depth)}
 """
         return prompt
+
+    def _build_expert_instructions(self, depth: str) -> str:
+        """构建专家版特殊指令"""
+        if depth != "expert":
+            return ""
+        return """
+
+## 专家版特殊要求（必须严格执行）
+
+### 1. 头-身-足-包四层结构
+在 four_layer_structure 章节中，将所有内容按以下四层重新组织并概述：
+- 【头/思维层面】核心原则、价值判断、适用边界、决策哲学
+- 【身/方法层面】可复用的方法论框架、系统方法、核心流程
+- 【足/行为层面】具体操作步骤、动作、行为细节、执行要点
+- 【包/应用层面】配套工具、模板、检查表、使用说明、口诀
+
+### 2. 萃取层级标识
+在 key_steps_analysis 和 methodology_framework 章节中，为每个要点标注其萃取层级：
+- 【一级/切框架】流程步骤/核心要素（不超过7项）
+- 【二级/挖细节】关键环节/动作/要点
+- 【三级/识障碍】易错点/困难点/易忽略点
+- 【四级/配工具】检查表/话术/流程图/口诀
+- 【五级/做优化】系统优化/三审定稿建议
+
+### 3. SPOR框架背景描述
+在 case_background 章节中，案例背景必须按 SPOR 框架组织：
+- S-Situation（情境）：何时、何地、何人、何环境
+- P-Problem（问题）：面临什么挑战、压力、冲突
+- O-Operation（过程）：采取了什么行动、关键决策
+- R-Result（结果）：取得了什么成果（必须包含量化数据）
+
+### 4. 流程-障碍映射表
+在 process_obstacle_mapping 章节中，以 Markdown 表格形式输出每个流程步骤对应的风险/障碍：
+| 流程步骤 | 易错点 | 困难点 | 易忽略点 | 预防措施 |
+要求：每个步骤至少对应一行，已识别的风险必须映射到具体步骤。
+
+### 5. 5Why根因链
+在 root_cause_analysis 章节中，对每个主要风险，展示完整的 5 层根因追溯链：
+表面现象 → 直接原因 → 间接原因 → 深层原因 → 根因
+格式要求：使用箭头链式表达，每层用一句话说明。
+
+### 6. 关键成功因素排序
+在 critical_success_factors 章节中：
+- 提取 3-5 个关键成功因素
+- 每个因素按金木水火土五维评分（1-10分）
+- 按综合优先级排序（priority=1为最高）
+- 说明每个因素为什么关键、在什么场景下最关键
+
+### 7. 场景适配指导
+在 application_guidance 章节中，基于访谈数据推断或引用已采集的场景变量，给出不同场景下的适配策略。格式：场景名称 → 关键变量 → 调整建议。
+
+### 8. 三审定稿评估
+在 three_review_assessment 章节中，对报告本身进行质量审核：
+- 审选题：主题价值评估、与业务目标的契合度
+- 审经验：严谨性（数据支撑）、完整性（四层覆盖）、逻辑性（因果清晰）、准确性（无误导）
+- 审落地：易用性（工具可直接使用）、实用性（新手可复现）、传承性（可培训推广）
+每个维度给出通过/待改进/不通过的判定及具体理由。"""
 
     async def generate_report(
         self,
@@ -230,8 +310,8 @@ class ReportService:
 
         messages_prompt = [{"role": "user", "content": prompt}]
 
-        # 根据深度级别设置 max_tokens：brief 3000, standard 6000, deep 10000
-        max_tokens_map = {"brief": 3000, "standard": 6000, "deep": 10000}
+        # 根据深度级别设置 max_tokens：brief 3000, standard 6000, deep 10000, expert 15000
+        max_tokens_map = {"brief": 3000, "standard": 6000, "deep": 10000, "expert": 15000}
         max_tokens = max_tokens_map.get(depth, 6000)
 
         try:
@@ -303,15 +383,20 @@ class ReportService:
         sections = [
             ("executive_summary", "执行摘要", True),
             ("case_background", "案例背景", True),
+            ("four_layer_structure", "头-身-足-包四层结构", False),
             ("methodology_framework", "方法论框架", True),
             ("key_steps_analysis", "关键步骤详解", True),
             ("decision_logic_analysis", "决策逻辑深度分析", False),
+            ("process_obstacle_mapping", "流程-障碍映射", False),
+            ("root_cause_analysis", "5Why根因链分析", False),
             ("obstacles_and_risks", "风险与挑战分析", True),
             ("tools_and_scripts", "工具与话术清单", True),
             ("application_guidance", "应用建议", True),
+            ("critical_success_factors", "关键成功因素", False),
             ("value_assessment", "价值评估", True),
             ("lessons_learned", "可迁移的经验教训", True),
             ("references", "相关概念与理论引用", False),
+            ("three_review_assessment", "三审定稿评估", False),
         ]
 
         for key, title, required in sections:

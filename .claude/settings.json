@@ -29,7 +29,24 @@
       "Bash(python -m pytest tests/test_interview_service_topic_drift_integration.py -v --tb=short)",
       "Bash(python -m pytest --tb=short)",
       "Bash(taskkill /F /IM uvicorn.exe)",
-      "Bash(taskkill /F /IM node.exe)"
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(pip3 list *)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r taskkill /F /PID)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('app/models/interview.py', doraise=True\\); py_compile.compile\\('app/schemas/interview.py', doraise=True\\); py_compile.compile\\('app/services/report_service.py', doraise=True\\); py_compile.compile\\('app/services/interview_service.py', doraise=True\\)\")",
+      "Bash(nohup bash *)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('app/schemas/interview.py', doraise=True\\)\")",
+      "Bash(nohup python *)",
+      "Bash(python -m pytest -x -q)",
+      "Bash(python -m pytest tests/ -x -q)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['id']\\)\")",
+      "Bash(python -m json.tool)",
+      "Bash(python -c \"from app.schemas.interview import ReportGenerateRequest; import json; print\\(json.dumps\\(ReportGenerateRequest.model_json_schema\\(\\), indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(wmic process *)",
+      "Bash(nohup npm *)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); ar=d.get\\('analysis_report',{}\\); print\\('Sections:', [k for k,v in ar.items\\(\\) if v]\\); print\\('Metadata:', d.get\\('metadata',{}\\)\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); ar=d.get\\('analysis_report',{}\\); print\\('Sections:', len\\([k for k,v in ar.items\\(\\) if v]\\)\\); print\\('Depth:', d.get\\('metadata',{}\\).get\\('depth'\\)\\)\")"
     ],
     "additionalDirectories": [
       "D:\\经验萃取\\experience-extraction-ai\\backend"
