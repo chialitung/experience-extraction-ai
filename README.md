@@ -1,200 +1,69 @@
-# 经验萃取AI系统
+# Experience Extraction AI
 
-AI驱动的经验萃取访谈辅助系统，帮助组织将业务专家的隐性经验转化为可复制的显性知识。
+[![Python](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
+[![Node](https://img.shields.io/badge/Node-18+-green)](https://nodejs.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-Compose-blue)](docker-compose.yml)
 
-## 项目结构
+AI 驱动的经验萃取访谈辅助系统，帮助组织将业务专家的隐性经验转化为可复制的显性知识。
 
-```
-experience-extraction-ai/
-├── backend/                 # FastAPI后端
-│   ├── app/
-│   │   ├── api/v1/         # API路由
-│   │   ├── core/           # 配置、数据库
-│   │   ├── models/         # 数据库模型
-│   │   ├── schemas/        # Pydantic模型
-│   │   ├── services/       # 业务逻辑
-│   │   │   ├── llm_service.py      # LLM调用封装
-│   │   │   ├── prompt_manager.py   # 提示词管理
-│   │   │   └── interview_service.py # 访谈核心服务
-│   │   └── prompts/        # 提示词模板
-│   │       ├── system/     # 系统级提示词
-│   │       ├── tasks/      # 任务级提示词
-│   │       └── quality/    # 质量保障提示词
-│   ├── alembic/            # 数据库迁移
-│   ├── tests/              # 测试
-│   ├── main.py             # 应用入口
-│   └── requirements.txt    # 依赖
-│
-└── frontend/               # React前端
-    ├── src/
-    │   ├── components/     # 组件
-    │   ├── pages/          # 页面
-    │   │   ├── HomePage.tsx
-    │   │   ├── InterviewListPage.tsx
-    │   │   ├── InterviewCreatePage.tsx
-    │   │   ├── BlueprintPage.tsx
-    │   │   ├── InterviewChatPage.tsx
-    │   │   └── OutputPage.tsx
-    │   ├── hooks/          # 自定义Hooks
-    │   ├── services/       # API服务
-    │   ├── store/          # 状态管理
-    │   └── types/          # TypeScript类型
-    ├── package.json
-    └── vite.config.ts
-```
+## ✨ 功能特性
 
-## 快速开始
+- **六步结构化访谈**：复盘事件 → 建构框架 → 挖掘细节 → 识别障碍 → 提炼工具 → 复述确认
+- **智能话题偏离检测**：jieba 分词 + Jaccard / 余弦相似度 + 跨轮升级，纯规则 O(n) 复杂度
+- **专家画像分析**：从回答文本特征自动推断沟通风格（健谈 / 寡言 / 谨慎 / 平衡）
+- **多格式成果输出**：访谈结束后自动生成话术卡、检查表、流程图、学习卡，支持 Word / Markdown / JSON 导出
+- **语音输入支持**：集成百度语音识别 WebSocket 实时转写
+- **可选 JWT 认证**：无 token 时开放访问（演示模式），有 token 时强制鉴权
 
-### 1. 环境要求
+## 🚀 Quick Start (Docker)
 
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 15+ (或 SQLite用于开发)
-- Redis (可选，用于缓存)
-
-### 2. 后端启动
+**前置要求**：Docker + Docker Compose
 
 ```bash
-cd backend
+# 1. 克隆仓库
+git clone https://github.com/chialitung/experience-extraction-ai.git
+cd experience-extraction-ai
 
-# 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# 2. 复制并编辑环境变量
+cp .env.docker.example .env
+# 编辑 .env：填入 POSTGRES_PASSWORD、SECRET_KEY、至少一个 LLM API Key
 
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 填入数据库URL和LLM API Key
-
-# 启动服务
-uvicorn main:app --reload
+# 3. 启动全部服务
+docker compose up -d --build
 ```
 
-后端服务将在 http://localhost:8000 运行
-API文档：http://localhost:8000/docs
+访问 http://localhost:8080 即可使用。
 
-### 3. 前端启动
+详见 [docs/deployment/docker.md](docs/deployment/docker.md)。
 
-```bash
-cd frontend
+## 🛠️ Manual Setup
 
-# 安装依赖
-npm install
+如需在本地直接运行前后端源码（不通过 Docker），请参考 [docs/deployment/manual.md](docs/deployment/manual.md)。
 
-# 启动开发服务器
-npm run dev
-```
+## 📁 Project Structure
 
-前端将在 http://localhost:5173 运行
+详见 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)。
 
-## 核心功能
+## 🔌 Tech Stack
 
-### 1. 访谈蓝图生成
-- 输入萃取主题、业务背景、专家角色
-- AI自动生成结构化访谈蓝图
-- 包含六步流程规划、五维价值评估
+| 后端 | 前端 |
+|------|------|
+| FastAPI + SQLAlchemy 2.0 async | React 18 + TypeScript |
+| PostgreSQL / SQLite | Vite |
+| Redis (缓存 / 限流) | TailwindCSS |
+| Alembic (迁移) | Zustand (状态管理) |
+| OpenAI / Anthropic / DeepSeek | Axios |
+| jieba (NLP) | Playwright (E2E) |
 
-### 2. 智能访谈对话
-- AI根据蓝图引导访谈流程
-- 五类问题动态调度（事实性/探索性/要因性/假设性/确认性）
-- 实时结构化内容萃取
+## 📚 Documentation
 
-### 3. 成果输出
-- 访谈结束后自动生成成果文档
-- 支持话术卡、检查表、流程图等多种格式
-- 可导出JSON
+- [Docker 部署指南](docs/deployment/docker.md) — 生产环境 Docker Compose 部署
+- [手动部署指南](docs/deployment/manual.md) — 本地开发/生产手动部署
+- [SMTP 邮件配置](docs/deployment/smtp.md) — QQ / 163 / Gmail / Outlook 配置
+- [开发环境设置](docs/development/setup.md) — 热更新、测试运行
+- [项目结构说明](docs/PROJECT_STRUCTURE.md) — 完整文件结构说明
 
-## 技术栈
+## 📜 License
 
-### 后端
-- **FastAPI**: 异步Web框架
-- **SQLAlchemy**: ORM
-- **Alembic**: 数据库迁移
-- **OpenAI/Anthropic**: LLM服务
-- **Jinja2**: 提示词模板
-
-### 前端
-- **React 18**: UI框架
-- **TypeScript**: 类型安全
-- **TailwindCSS**: 样式
-- **Zustand**: 状态管理
-- **Axios**: HTTP客户端
-
-## 六步萃取流程
-
-1. **复盘事件**: 获取成功案例背景
-2. **建构框架**: 识别核心步骤框架
-3. **挖掘细节**: 深挖每个步骤的具体动作
-4. **识别障碍**: 识别易错点、困难点
-5. **提炼工具**: 提炼可操作的工具/话术
-6. **复述确认**: 总结确认，专家审核
-
-## API接口
-
-### 访谈管理
-- `POST /api/v1/interviews` - 创建访谈
-- `GET /api/v1/interviews` - 列表
-- `GET /api/v1/interviews/{id}` - 详情
-- `PATCH /api/v1/interviews/{id}` - 更新
-
-### 蓝图
-- `POST /api/v1/interviews/{id}/blueprint/generate` - 生成蓝图
-- `POST /api/v1/interviews/{id}/blueprint/confirm` - 确认蓝图
-
-### 对话
-- `POST /api/v1/interviews/{id}/messages` - 发送消息
-- `GET /api/v1/interviews/{id}/messages` - 消息历史
-- `POST /api/v1/interviews/{id}/messages/stream` - 流式对话
-
-### 成果
-- `GET /api/v1/interviews/{id}/structured-content` - 结构化内容
-- `POST /api/v1/interviews/{id}/complete` - 完成访谈
-- `GET /api/v1/interviews/{id}/output` - 获取成果
-
-## 配置说明
-
-### 环境变量
-
-```env
-# 数据库
-DATABASE_URL=postgresql://user:password@localhost:5432/experience_extraction
-
-# LLM (至少配置一个)
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-4o
-
-ANTHROPIC_API_KEY=sk-ant-...
-ANTHROPIC_MODEL=claude-3-5-sonnet-20241022
-
-# 应用
-SECRET_KEY=your-secret-key
-```
-
-## 开发计划
-
-### MVP (已完成)
-- [x] 后端基础框架
-- [x] 数据库模型
-- [x] LLM服务封装
-- [x] 提示词管理
-- [x] 访谈核心API
-- [x] 前端基础框架
-- [x] 核心页面实现
-
-### 后续迭代
-- [ ] 专家画像自动识别
-- [ ] 主题偏离检测
-- [ ] 流式响应优化
-- [ ] 用户认证
-- [ ] 更多成果模板
-- [ ] 数据分析仪表盘
-
-## 贡献
-
-欢迎提交Issue和PR！
-
-## 许可证
-
-MIT
+[MIT](LICENSE)
