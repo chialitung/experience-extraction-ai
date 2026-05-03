@@ -944,7 +944,7 @@ export function InterviewChatPage() {
             </div>
           )}
 
-          {/* 价值评估（金木水火土） */}
+          {/* 价值评估（五维） */}
           {currentInterview?.blueprint?.value_assessment && (
             <div className="mb-4 bg-white border border-gray-200 rounded-lg p-3">
               <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
@@ -952,18 +952,23 @@ export function InterviewChatPage() {
                 价值评估
               </h4>
               <div className="grid grid-cols-5 gap-1 text-center">
-                {Object.entries(currentInterview.blueprint.value_assessment as Record<string, any>)
-                  .filter(([k]) => ['金', '木', '水', '火', '土'].includes(k))
-                  .map(([key, val]) => {
-                    const score = typeof val === 'number' ? val : (typeof val === 'object' ? val?.score || 0 : 0);
-                    const color = score >= 4 ? 'text-green-600 bg-green-50' : score >= 3 ? 'text-yellow-600 bg-yellow-50' : 'text-gray-500 bg-gray-50';
-                    return (
-                      <div key={key} className={`rounded p-1 ${color}`}>
-                        <div className="text-xs font-medium">{key}</div>
-                        <div className="text-sm font-bold">{score}</div>
-                      </div>
-                    );
-                  })}
+                {[
+                  { key: 'gold', label: '高价值' },
+                  { key: 'wood', label: '有难度' },
+                  { key: 'water', label: '常使用' },
+                  { key: 'fire', label: '急需要' },
+                  { key: 'earth', label: '覆盖广' },
+                ].map(({ key, label }) => {
+                  const val = (currentInterview.blueprint.value_assessment as Record<string, any>)?.[key];
+                  const score = typeof val === 'number' ? val : 0;
+                  const color = score >= 7 ? 'text-green-600 bg-green-50' : score >= 4 ? 'text-yellow-600 bg-yellow-50' : 'text-gray-500 bg-gray-50';
+                  return (
+                    <div key={key} className={`rounded p-1 ${color}`}>
+                      <div className="text-xs font-medium">{label}</div>
+                      <div className="text-sm font-bold">{score}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

@@ -26,7 +26,7 @@
     "type": "探索性",
     "content": "具体的问题内容",
     "purpose": "获取第二步的具体动作细节",
-    "value_dimension": "木（有难度）",
+    "value_dimension": "有难度",
     "adaptation_note": "针对不善言辞型专家，问题已拆解为更具体的子问题"
   },
   "follow_up": {

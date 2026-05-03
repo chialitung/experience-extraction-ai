@@ -155,7 +155,7 @@ class ReportService:
 {json.dumps(blueprint, ensure_ascii=False, indent=2)[:2000]}
 ```
 
-### 价值评估（金木水火土）
+### 价值评估（五维：高价值、有难度、常使用、急需要、覆盖广）
 ```json
 {json.dumps(value_assessment, ensure_ascii=False, indent=2)}
 ```
@@ -183,7 +183,7 @@ class ReportService:
     "obstacles_and_risks": "风险与挑战分析（按严重度排序）",
     "tools_and_scripts": "工具与话术清单",
     "application_guidance": "应用建议（适用场景、前提条件、常见变体）",
-    "value_assessment": "价值评估（金木水火土五维分析）",
+    "value_assessment": "价值评估（五维分析：高价值、有难度、常使用、急需要、覆盖广）",
     "lessons_learned": "可迁移的经验教训",
     "references": "相关概念/理论引用（仅深度版需要）"
   }},
@@ -199,7 +199,7 @@ class ReportService:
 1. 每个章节必须是完整的Markdown格式文本（支持标题、列表、表格、引用）
 2. {config['name']}必须包含以下章节：{', '.join(config['sections_required'])}
 3. 深度版需要在 decision_logic_analysis 中分析专家每一步的决策逻辑、信息来源、替代方案考量
-4. 价值评估章节必须包含金木水火土五维的具体评分和解释
+4. 价值评估章节必须包含五维（高价值、有难度、常使用、急需要、覆盖广）的具体评分和解释。
 5. 应用建议要具体，包含适用场景、前提条件、常见变体和注意事项
 6. 所有内容必须基于访谈实际数据，不得编造
 7. 字数严格控制在 {config['word_target']} 范围内
@@ -251,7 +251,7 @@ class ReportService:
 ### 6. 关键成功因素排序
 在 critical_success_factors 章节中：
 - 提取 3-5 个关键成功因素
-- 每个因素按金木水火土五维评分（1-10分）
+- 每个因素按五维（高价值、有难度、常使用、急需要、覆盖广）评分（1-10分）
 - 按综合优先级排序（priority=1为最高）
 - 说明每个因素为什么关键、在什么场景下最关键
 

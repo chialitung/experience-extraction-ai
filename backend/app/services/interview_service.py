@@ -584,10 +584,10 @@ class InterviewService:
             drift_history=interview.drift_history or [],
         )
         analysis_dict = content_analyzer.to_dict(analysis)
-        # LLM 灰区仲裁：规则置信度处于 (0.15, 0.35) 时触发语义判定
-        # 优化：前1轮不触发灰区仲裁，早期回答天然具有探索性
+        # LLM 灰区仲裁：规则置信度处于灰区时触发语义判定
+        # 优化：前1轮不触发（早期回答天然具有探索性），超过4轮后也不再触发
         if (settings.TOPIC_DRIFT_GRAY_LOWER < analysis.off_topic_confidence < settings.TOPIC_DRIFT_THRESHOLD
-                and turns > 1):
+                and 1 < turns <= 4):
             last_question = await self._get_last_ai_question(interview_id)
             llm_drift = await self._detect_topic_drift_llm(
                 user_message=user_message,
@@ -652,7 +652,7 @@ class InterviewService:
 ## 高阶萃取采集（专家版报告所需）
 在确认核心内容准确性后，请进一步向专家确认以下内容（每轮问1-2个问题，不要一次性问太多）：
 1. 【场景变量】这个方法在哪些不同场景下需要调整？（如客户类型、预算规模、决策阶段、团队规模等差异）每个场景下的关键变量是什么？
-2. 【关键成功因素】如果只能保留3个最关键的成功因素，专家会选择哪3个？请为每个因素按金木水火土五维评分（1-10分）。
+2. 【关键成功因素】如果只能保留3个最关键的成功因素，专家会选择哪3个？请为每个因素按五维评分（1-10分）。
 3. 【根因追溯】对于已识别的每个主要风险/障碍，请连续追问"为什么会发生"，记录完整的根因链（至少3层，最多5层）。
 
 你的回复中 structured_update 字段除了常规的 steps/principles/tools/risks 外，还需根据本轮确认的内容包含以下字段之一或多项：
@@ -1095,10 +1095,10 @@ class InterviewService:
             drift_history=interview.drift_history or [],
         )
         analysis_dict = content_analyzer.to_dict(analysis)
-        # LLM 灰区仲裁：规则置信度处于 (0.15, 0.35) 时触发语义判定
-        # 优化：前1轮不触发灰区仲裁，早期回答天然具有探索性
+        # LLM 灰区仲裁：规则置信度处于灰区时触发语义判定
+        # 优化：前1轮不触发（早期回答天然具有探索性），超过4轮后也不再触发
         if (settings.TOPIC_DRIFT_GRAY_LOWER < analysis.off_topic_confidence < settings.TOPIC_DRIFT_THRESHOLD
-                and turns > 1):
+                and 1 < turns <= 4):
             last_question = await self._get_last_ai_question(interview_id)
             llm_drift = await self._detect_topic_drift_llm(
                 user_message=user_message,
@@ -1305,10 +1305,10 @@ class InterviewService:
             drift_history=interview.drift_history or [],
         )
         analysis_dict = content_analyzer.to_dict(analysis)
-        # LLM 灰区仲裁：规则置信度处于 (0.15, 0.35) 时触发语义判定
-        # 优化：前1轮不触发灰区仲裁，早期回答天然具有探索性
+        # LLM 灰区仲裁：规则置信度处于灰区时触发语义判定
+        # 优化：前1轮不触发（早期回答天然具有探索性），超过4轮后也不再触发
         if (settings.TOPIC_DRIFT_GRAY_LOWER < analysis.off_topic_confidence < settings.TOPIC_DRIFT_THRESHOLD
-                and turns > 1):
+                and 1 < turns <= 4):
             last_question = await self._get_last_ai_question(interview_id)
             llm_drift = await self._detect_topic_drift_llm(
                 user_message=user_message,
@@ -1373,7 +1373,7 @@ class InterviewService:
 ## 高阶萃取采集（专家版报告所需）
 在确认核心内容准确性后，请进一步向专家确认以下内容（每轮问1-2个问题，不要一次性问太多）：
 1. 【场景变量】这个方法在哪些不同场景下需要调整？（如客户类型、预算规模、决策阶段、团队规模等差异）每个场景下的关键变量是什么？
-2. 【关键成功因素】如果只能保留3个最关键的成功因素，专家会选择哪3个？请为每个因素按金木水火土五维评分（1-10分）。
+2. 【关键成功因素】如果只能保留3个最关键的成功因素，专家会选择哪3个？请为每个因素按五维评分（1-10分）。
 3. 【根因追溯】对于已识别的每个主要风险/障碍，请连续追问"为什么会发生"，记录完整的根因链（至少3层，最多5层）。
 
 你的回复中 structured_update 字段除了常规的 steps/principles/tools/risks 外，还需根据本轮确认的内容包含以下字段之一或多项：
@@ -2115,7 +2115,7 @@ class InterviewService:
                     for t in tools
                 ],
                 "key_concepts": [
-                    {"concept": "经验价值", "explanation": f"金:{value.get('金', value.get('gold', 'N/A'))} 木:{value.get('木', value.get('wood', 'N/A'))} 水:{value.get('水', value.get('water', 'N/A'))} 火:{value.get('火', value.get('fire', 'N/A'))} 土:{value.get('土', value.get('earth', 'N/A'))}"}
+                    {"concept": "经验价值", "explanation": f"高价值:{value.get('gold', value.get('高价值', 'N/A'))} 有难度:{value.get('wood', value.get('有难度', 'N/A'))} 常使用:{value.get('water', value.get('常使用', 'N/A'))} 急需要:{value.get('fire', value.get('急需要', 'N/A'))} 覆盖广:{value.get('earth', value.get('覆盖广', 'N/A'))}"}
                 ] if value else []
             }
 

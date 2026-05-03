@@ -1,6 +1,6 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { MessageSquare, Plus, Settings, Home, LogOut, User, Menu, X, LogIn, Users } from 'lucide-react';
+import { MessageSquare, Plus, Settings, Home, LogOut, User, Menu, X, LogIn, Users, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function Layout() {
@@ -17,6 +17,7 @@ export function Layout() {
     { path: '/', icon: Home, label: '首页' },
     { path: '/interviews', icon: MessageSquare, label: '访谈列表' },
     { path: '/interviews/new', icon: Plus, label: '新建访谈' },
+    { path: '/text-analysis', icon: FileText, label: '文本分析' },
     ...(isAdmin ? [{ path: '/admin/users', icon: Users, label: '用户管理' }] : []),
   ];
 

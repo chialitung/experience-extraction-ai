@@ -58,9 +58,9 @@ class Settings(BaseSettings):
     FRONTEND_BASE_URL: str = "http://localhost:5173"
 
     # Topic Drift Detection
-    TOPIC_DRIFT_THRESHOLD: float = 0.35
-    TOPIC_DRIFT_GRAY_LOWER: float = 0.15
-    TOPIC_DRIFT_PROMPT_INJECT: float = 0.20
+    TOPIC_DRIFT_THRESHOLD: float = 0.55
+    TOPIC_DRIFT_GRAY_LOWER: float = 0.30
+    TOPIC_DRIFT_PROMPT_INJECT: float = 0.50
     TOPIC_DRIFT_MAX_HISTORY: int = 10
 
     @property

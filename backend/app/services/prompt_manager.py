@@ -78,12 +78,16 @@ class PromptManager:
                             base_prompt += f"蓝图建议的追问方向：{'; '.join(suggested_questions[:3])}\n"
                         break
             
-            # 注入金木水火土价值评估
+            # 注入五维价值评估
             value = blueprint.get("value_assessment", {})
             if value:
-                base_prompt += f"\n价值评估（金木水火土）：\n"
+                base_prompt += f"\n价值评估（五维：高价值、有难度、常使用、急需要、覆盖广）：\n"
+                dim_names = {"gold": "高价值", "wood": "有难度", "water": "常使用", "fire": "急需要", "earth": "覆盖广"}
                 for k, v in value.items():
-                    base_prompt += f"  - {k}：{v}\n"
+                    if k in dim_names:
+                        base_prompt += f"  - {dim_names[k]}：{v}\n"
+                    elif k != "reasons":
+                        base_prompt += f"  - {k}：{v}\n"
         
         # ===== 实时内容分析结果注入 =====
         analysis = interview_config.get("content_analysis")

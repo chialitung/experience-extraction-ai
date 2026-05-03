@@ -162,22 +162,22 @@ export function BlueprintPage() {
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <Target className="w-5 h-5 mr-2" />
-              价值评估（金木水火土）
+              价值评估（五维）
             </h2>
             <div className="grid grid-cols-5 gap-4">
               {[
-                { key: 'gold', label: '金', name: '高价值', color: 'bg-yellow-100 text-yellow-700' },
-                { key: 'wood', label: '木', name: '有难度', color: 'bg-green-100 text-green-700' },
-                { key: 'water', label: '水', name: '常使用', color: 'bg-blue-100 text-blue-700' },
-                { key: 'fire', label: '火', name: '急需要', color: 'bg-red-100 text-red-700' },
-                { key: 'earth', label: '土', name: '覆盖广', color: 'bg-amber-100 text-amber-700' },
+                { key: 'gold', name: '高价值', color: 'bg-yellow-100 text-yellow-700' },
+                { key: 'wood', name: '有难度', color: 'bg-green-100 text-green-700' },
+                { key: 'water', name: '常使用', color: 'bg-blue-100 text-blue-700' },
+                { key: 'fire', name: '急需要', color: 'bg-red-100 text-red-700' },
+                { key: 'earth', name: '覆盖广', color: 'bg-amber-100 text-amber-700' },
               ].map((item) => {
                 const score = blueprint.value_assessment[item.key as keyof typeof blueprint.value_assessment] as number;
                 const reason = blueprint.value_assessment.reasons?.[item.key];
                 return (
                   <div key={item.key} className={`${item.color} rounded-lg p-4 text-center`}>
                     <div className="text-2xl font-bold">{score}</div>
-                    <div className="text-sm font-medium">{item.label}·{item.name}</div>
+                    <div className="text-sm font-medium">{item.name}</div>
                     {reason && <div className="text-xs mt-1 opacity-75">{reason}</div>}
                   </div>
                 );

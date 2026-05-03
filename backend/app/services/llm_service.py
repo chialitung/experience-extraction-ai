@@ -58,7 +58,7 @@ class LLMService:
                     "type": "探索性",
                     "content": "您提到当时客户对价格有异议，能否详细描述一下客户当时具体说了什么？您的第一反应是什么？",
                     "purpose": "深入挖掘专家面对异议时的真实思考过程和关键动作",
-                    "value_dimension": "木（有难度）",
+                    "value_dimension": "有难度",
                 },
                 "structured_update": {
                     "event_description": "客户因价格高于竞品而犹豫",
@@ -83,8 +83,8 @@ class LLMService:
                         {"question": "您当时的第一反应和应对思路是什么？", "objective": "挖掘决策逻辑", "strategy": "探索性问题"},
                     ],
                     "expected_value": [
-                        {"dimension": "金", "indicator": "提高新人销售成交率15%以上"},
-                        {"dimension": "木", "indicator": "形成标准化异议处理SOP"},
+                        {"dimension": "高价值", "indicator": "提高新人销售成交率15%以上"},
+                        {"dimension": "有难度", "indicator": "形成标准化异议处理SOP"},
                     ],
                     "structure_plan": [
                         {"step": "复盘事件", "duration": "10min", "focus": "还原具体案例"},
@@ -110,7 +110,7 @@ class LLMService:
                     "decision_logic": "不直接反驳价格，而是重塑价值认知，让客户自己得出'值得'的结论",
                     "obstacles": ["急于解释/反驳", "直接降价", "忽视客户真实需求"],
                     "tools": ["价值对比表", "ROI计算器话术", "三段式回应模板"],
-                    "value_assessment": {"金": 0.9, "木": 0.8, "水": 0.7, "火": 0.6, "土": 0.5},
+                    "value_assessment": {"gold": 9, "wood": 8, "water": 7, "fire": 6, "earth": 5, "reasons": {"gold": "直接影响销售业绩", "wood": "需要丰富经验", "water": "日常高频场景", "fire": "新员工普遍面临", "earth": "适用于多种客户"}},
                 }
             }
         elif "output" in prompt_lower or "封装" in system_prompt or "成果" in system_prompt:

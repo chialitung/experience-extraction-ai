@@ -27,7 +27,7 @@ class AnswerAnalysis:
 
 # 中文停用词表（扩展版）
 _STOP_WORDS = {
-    "的", "了", "和", "与", "在", "是", "为", "对", "如何", "怎样", "怎么", "一个", "经验", "萃取",
+    "的", "了", "和", "与", "在", "是", "为", "对", "一个",
     "我", "你", "他", "她", "它", "我们", "你们", "他们", "这", "那", "这些", "那些",
     "有", "没有", "不", "没", "也", "就", "都", "而", "及", "或", "但是", "因为", "所以",
     "然后", "接着", "最后", "首先", "如果", "虽然", "但是", "之", "着", "过", "得", "地",
@@ -284,10 +284,10 @@ class ContentAnalyzer:
         signals = []
         score = 0.0
 
-        # 1. 显式偏离短语（强信号，保持不变）
+        # 1. 显式偏离短语（强信号，封顶 0.25）
         off_topic_hits = [p for p in self.OFF_TOPIC_PHRASES if p in text]
         if off_topic_hits:
-            score += 0.25 * len(off_topic_hits)
+            score += min(0.25, 0.20 * len(off_topic_hits))
             signals.append(f"检测到偏离短语：{', '.join(off_topic_hits[:3])}")
 
         # 2. 主题语义相似度（jieba 分词 + Jaccard）
@@ -295,23 +295,15 @@ class ContentAnalyzer:
         answer_tokens = _jieba_tokenize(text, filter_stop=True, filter_pos=True)
         if theme_tokens:
             theme_jaccard = _jaccard_similarity(set(theme_tokens), set(answer_tokens))
-            if theme_jaccard < 0.2:
-                score += 0.20
+            if theme_jaccard < 0.15:
+                score += 0.15
                 signals.append(f"主题语义相似度低（{theme_jaccard:.0%}），可能偏离主题")
 
         # 3. 步骤语义相似度（jieba 分词 + 余弦相似度）
         step_relevance = self._check_step_relevance(text, current_step)
-        if step_relevance < 0.3:
-            score += 0.20
+        if step_relevance < 0.25:
+            score += 0.15
             signals.append(f"与当前步骤'{current_step}'的语义相关度低（{step_relevance:.0%}）")
-
-        # 4. 回答长度异常（极长且没有结构 = 可能发散）
-        if len(text) > 400:
-            # 检查是否有清晰结构
-            has_structure = bool(re.search(r"(?:\d+[.．、]|\n[-•]\s)", text))
-            if not has_structure:
-                score += 0.15
-                signals.append("回答很长但缺乏清晰结构，疑似发散")
 
         # 裁剪基础分
         base_score = min(1.0, score)
@@ -479,7 +471,7 @@ class ContentAnalyzer:
         similarity = _cosine_similarity(answer_tokens, desc_tokens)
         # 将余弦相似度（通常在 0~0.5 之间）映射到更直观的 0~1 范围
         # 使用 sigmoid-like 映射：低相似度时快速下降，高相似度时平缓
-        mapped = min(1.0, similarity * 2.5)
+        mapped = min(1.0, similarity * 1.5)
         return mapped
 
     def full_analysis(self, answer: str, theme: str, current_step: str,

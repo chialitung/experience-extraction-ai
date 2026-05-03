@@ -164,3 +164,27 @@ export interface TokenResponse {
   expires_in: number;
   user: User;
 }
+
+// ==================== TextAnalysis Types ====================
+
+export interface TextAnalysis {
+  id: string;
+  theme: string;
+  background?: string;
+  expert_role?: string;
+  raw_text_length: number;
+  cleaned_messages: { role: string; content: string }[];
+  structured_content: Record<string, any>;
+  analysis_report: Record<string, any>;
+  status: string;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TextAnalysisCreateRequest {
+  theme: string;
+  background?: string;
+  expert_role?: string;
+  raw_text: string;
+}

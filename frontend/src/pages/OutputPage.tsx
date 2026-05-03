@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FileText, CheckCircle, Printer,
   MessageSquare, ListChecks, GitBranch, GraduationCap, BookOpen,
-  Layers, Lightbulb, Wrench, AlertTriangle, FileCode, FileSpreadsheet,
+  Layers, Lightbulb, Wrench, AlertTriangle, FileSpreadsheet,
   ChevronDown, Loader2, BarChart3,
 } from 'lucide-react';
 import { interviewApi } from '@/services/api';

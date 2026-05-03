@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Interview, InterviewCreateRequest, Message, Blueprint, StructuredContent, ExpertProfile, ContentAnalysis, User, TokenResponse } from '@/types';
+import type { Interview, InterviewCreateRequest, Message, Blueprint, StructuredContent, ExpertProfile, ContentAnalysis, User, TokenResponse, TextAnalysis, TextAnalysisCreateRequest } from '@/types';
 import { SKIP_AUTH } from '@/config/auth';
 import { logger } from '@/utils/logger';
 
@@ -310,6 +310,29 @@ export const configApi = {
     baidu_speech_api_key?: string;
     baidu_speech_secret_key?: string;
   }) => api.put('/config', data),
+};
+
+// ==================== Text Analysis APIs ====================
+
+export const textAnalysisApi = {
+  create: (data: TextAnalysisCreateRequest) =>
+    api.post<TextAnalysis>('/text-analysis', data),
+
+  list: (skip = 0, limit = 20) =>
+    api.get<{ items: TextAnalysis[]; total: number; page: number; limit: number }>(
+      `/text-analysis?skip=${skip}&limit=${limit}`
+    ),
+
+  get: (id: string) =>
+    api.get<TextAnalysis>(`/text-analysis/${id}`),
+
+  delete: (id: string) =>
+    api.delete(`/text-analysis/${id}`),
+
+  export: (id: string, format: string) => {
+    const url = `/text-analysis/${id}/export?format=${format}`;
+    return api.get(url, { responseType: 'blob' });
+  },
 };
 
 export default api;

@@ -9,6 +9,8 @@ import { InterviewCreatePage } from '@/pages/InterviewCreatePage';
 import { BlueprintPage } from '@/pages/BlueprintPage';
 import { InterviewChatPage } from '@/pages/InterviewChatPage';
 import { ReportPage } from '@/pages/ReportPage';
+import { TextAnalysisListPage } from '@/pages/TextAnalysisListPage';
+import { TextAnalysisPage } from '@/pages/TextAnalysisPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AuthPage } from '@/pages/AuthPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
@@ -69,6 +71,21 @@ function App() {
               <Route path="interviews/:id/report" element={
                 <ErrorBoundary>
                   <ReportPage defaultView="report" />
+                </ErrorBoundary>
+              } />
+              <Route path="text-analysis" element={
+                <ErrorBoundary>
+                  <TextAnalysisListPage />
+                </ErrorBoundary>
+              } />
+              <Route path="text-analysis/new" element={
+                <ErrorBoundary>
+                  <TextAnalysisPage />
+                </ErrorBoundary>
+              } />
+              <Route path="text-analysis/:id" element={
+                <ErrorBoundary>
+                  <TextAnalysisPage />
                 </ErrorBoundary>
               } />
               <Route path="settings" element={

@@ -62,7 +62,7 @@
     "type": "探索性",
     "content": "具体的问题内容",
     "purpose": "这个问题旨在获取什么信息",
-    "value_dimension": "木（有难度）"
+    "value_dimension": "有难度"
   },
   "structured_update": {
     "steps": [

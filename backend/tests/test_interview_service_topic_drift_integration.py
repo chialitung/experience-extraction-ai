@@ -78,9 +78,9 @@ def _patch_content_analyzer(off_topic_confidence: float):
 @pytest.mark.asyncio
 @patch.object(InterviewService, "_detect_topic_drift_llm", side_effect=MockDriftTriggered())
 async def test_generate_ai_response_gray_zone_triggers_llm(mock_detect_drift, service, base_interview):
-    """INT-001: 灰区 0.25 应触发 _detect_topic_drift_llm（轮次>1时）"""
+    """INT-001: 灰区 0.40 应触发 _detect_topic_drift_llm（轮次 2-4 时）"""
     _setup_service_minimal(service, base_interview, turns=2)
-    with _patch_content_analyzer(0.25):
+    with _patch_content_analyzer(0.40):
         with pytest.raises(MockDriftTriggered):
             await service.generate_ai_response(str(uuid4()), "用户回答")
     mock_detect_drift.assert_awaited_once()
@@ -89,9 +89,9 @@ async def test_generate_ai_response_gray_zone_triggers_llm(mock_detect_drift, se
 @pytest.mark.asyncio
 @patch.object(InterviewService, "_detect_topic_drift_llm", new_callable=AsyncMock)
 async def test_generate_ai_response_high_confidence_no_llm(mock_detect_drift, service, base_interview):
-    """INT-002: 高置信度 0.50 不触发 LLM"""
+    """INT-002: 高置信度 0.60 不触发 LLM"""
     _setup_service_minimal(service, base_interview)
-    with _patch_content_analyzer(0.50):
+    with _patch_content_analyzer(0.60):
         try:
             await service.generate_ai_response(str(uuid4()), "用户回答")
         except Exception:
@@ -102,9 +102,9 @@ async def test_generate_ai_response_high_confidence_no_llm(mock_detect_drift, se
 @pytest.mark.asyncio
 @patch.object(InterviewService, "_detect_topic_drift_llm", new_callable=AsyncMock)
 async def test_generate_ai_response_low_confidence_no_llm(mock_detect_drift, service, base_interview):
-    """INT-003: 低置信度 0.10 不触发 LLM"""
+    """INT-003: 低置信度 0.20 不触发 LLM"""
     _setup_service_minimal(service, base_interview)
-    with _patch_content_analyzer(0.10):
+    with _patch_content_analyzer(0.20):
         try:
             await service.generate_ai_response(str(uuid4()), "用户回答")
         except Exception:
@@ -114,14 +114,40 @@ async def test_generate_ai_response_low_confidence_no_llm(mock_detect_drift, ser
 
 @pytest.mark.asyncio
 @patch.object(InterviewService, "_detect_topic_drift_llm", side_effect=MockDriftTriggered())
-async def test_generate_ai_response_boundary_0_15_not_trigger(mock_detect_drift, service, base_interview):
-    """INT-008: 边界 confidence=0.15 不满足 >0.15，不触发"""
+async def test_generate_ai_response_boundary_gray_lower_not_trigger(mock_detect_drift, service, base_interview):
+    """INT-008: 边界 confidence=0.30 不满足 >0.30，不触发"""
     _setup_service_minimal(service, base_interview)
-    with _patch_content_analyzer(0.15):
+    with _patch_content_analyzer(0.30):
         try:
             await service.generate_ai_response(str(uuid4()), "用户回答")
         except MockDriftTriggered:
-            pytest.fail("边界 0.15 不应触发灰区仲裁")
+            pytest.fail("边界 0.30 不应触发灰区仲裁")
+    mock_detect_drift.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch.object(InterviewService, "_detect_topic_drift_llm", side_effect=MockDriftTriggered())
+async def test_generate_ai_response_boundary_threshold_not_trigger(mock_detect_drift, service, base_interview):
+    """INT-009: 边界 confidence=0.55 不满足 <0.55，不触发"""
+    _setup_service_minimal(service, base_interview)
+    with _patch_content_analyzer(0.55):
+        try:
+            await service.generate_ai_response(str(uuid4()), "用户回答")
+        except MockDriftTriggered:
+            pytest.fail("边界 0.55 不应触发灰区仲裁")
+    mock_detect_drift.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch.object(InterviewService, "_detect_topic_drift_llm", side_effect=MockDriftTriggered())
+async def test_generate_ai_response_gray_zone_after_max_turns_no_trigger(mock_detect_drift, service, base_interview):
+    """INT-010: 超过灰区最大轮次(4轮)后不触发仲裁"""
+    _setup_service_minimal(service, base_interview, turns=5)
+    with _patch_content_analyzer(0.40):
+        try:
+            await service.generate_ai_response(str(uuid4()), "用户回答")
+        except MockDriftTriggered:
+            pytest.fail("超过4轮不应触发灰区仲裁")
     mock_detect_drift.assert_not_called()
 
 
@@ -130,9 +156,9 @@ async def test_generate_ai_response_boundary_0_15_not_trigger(mock_detect_drift,
 @pytest.mark.asyncio
 @patch.object(InterviewService, "_detect_topic_drift_llm", side_effect=MockDriftTriggered())
 async def test_generate_question_only_gray_zone(mock_detect_drift, service, base_interview):
-    """INT-004: _generate_ai_question_only 灰区 0.25 触发（轮次>1时）"""
+    """INT-004: _generate_ai_question_only 灰区 0.40 触发（轮次 2-4 时）"""
     _setup_service_minimal(service, base_interview, turns=2)
-    with _patch_content_analyzer(0.25):
+    with _patch_content_analyzer(0.40):
         with pytest.raises(MockDriftTriggered):
             await service._generate_ai_question_only(str(uuid4()), "用户回答")
     mock_detect_drift.assert_awaited_once()
@@ -156,9 +182,9 @@ async def test_generate_question_only_low_no_trigger(mock_detect_drift, service,
 @pytest.mark.asyncio
 @patch.object(InterviewService, "_detect_topic_drift_llm", side_effect=MockDriftTriggered())
 async def test_generate_ai_response_stream_gray_zone(mock_detect_drift, service, base_interview):
-    """INT-006: generate_ai_response_stream 灰区 0.20 触发（轮次>1时）"""
+    """INT-006: generate_ai_response_stream 灰区 0.40 触发（轮次 2-4 时）"""
     _setup_service_minimal(service, base_interview, turns=2)
-    with _patch_content_analyzer(0.20):
+    with _patch_content_analyzer(0.40):
         with pytest.raises(MockDriftTriggered):
             async for _ in service.generate_ai_response_stream(str(uuid4()), "用户回答"):
                 pass
@@ -167,13 +193,13 @@ async def test_generate_ai_response_stream_gray_zone(mock_detect_drift, service,
 
 @pytest.mark.asyncio
 @patch.object(InterviewService, "_detect_topic_drift_llm", new_callable=AsyncMock)
-async def test_generate_ai_response_stream_boundary_0_35_not_trigger(mock_detect_drift, service, base_interview):
-    """INT-007: 边界 confidence=0.35 不满足 <0.35，不触发"""
+async def test_generate_ai_response_stream_boundary_threshold_not_trigger(mock_detect_drift, service, base_interview):
+    """INT-007: 边界 confidence=0.55 不满足 <0.55，不触发"""
     _setup_service_minimal(service, base_interview)
-    with _patch_content_analyzer(0.35):
+    with _patch_content_analyzer(0.55):
         try:
             async for _ in service.generate_ai_response_stream(str(uuid4()), "用户回答"):
                 pass
         except MockDriftTriggered:
-            pytest.fail("边界 0.35 不应触发灰区仲裁")
+            pytest.fail("边界 0.55 不应触发灰区仲裁")
     mock_detect_drift.assert_not_called()

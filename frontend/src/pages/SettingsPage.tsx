@@ -439,7 +439,7 @@ export function SettingsPage() {
             关于系统
           </h2>
           <p className="text-gray-600 text-sm leading-relaxed mb-4">
-            经验萃取 AI 系统是一套基于 BEST 高能经验萃取方法论和「金木水火土」价值标准的智能化访谈辅助系统。
+            经验萃取 AI 系统是一套基于 BEST 高能经验萃取方法论和五维价值评估标准的智能化访谈辅助系统。
             通过多轮对话引导，帮助萃取专家从业务高手处高效挖掘、结构化并封装高价值经验。
           </p>
           <div className="text-xs text-gray-400 space-y-1">

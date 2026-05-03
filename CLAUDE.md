@@ -52,7 +52,7 @@ Pure rule-based engine, **zero LLM calls**, sub-millisecond. Infers expert commu
 ### Prompt Management
 Jinja2 templates in `app/prompts/`. `PromptManager` renders `system/role_definition.md` plus four dynamically injected sections:
 1. **Expert profile adaptation** — communication style and strategy
-2. **Blueprint guidance** — current step focus, key questions, 金木水火土 value assessment
+2. **Blueprint guidance** — current step focus, key questions, 五维价值评估
 3. **Real-time content analysis** — depth score, topic drift, information gaps
 4. **Time budget control** — turn limit and word limit per stage
 

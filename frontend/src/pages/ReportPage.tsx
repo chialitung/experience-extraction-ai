@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, FileText, Loader2, BookOpen,
-  ChevronDown, Printer, FileCode, FileSpreadsheet, Sparkles,
+  ChevronDown, Printer, FileSpreadsheet, Sparkles,
   BarChart3, Lightbulb, AlertTriangle, Wrench, Target,
   CheckCircle, Layers, MessageSquare, ListChecks, GitBranch,
   GraduationCap, Award, Table, Star, CheckSquare,
 } from 'lucide-react';
 import { interviewApi } from '@/services/api';
 import { OutputPageSkeleton } from '@/components/Skeleton';
+import { ReportToc } from '@/components/ReportToc';
+import { useReportScrollSpy } from '@/hooks/useReportScrollSpy';
 import { logger } from '@/utils/logger';
 
 const DEPTH_OPTIONS = [
@@ -47,6 +49,30 @@ interface ReportSection {
   content?: string;
 }
 
+const buildReportSections = (analysisReport: any): ReportSection[] => {
+  if (!analysisReport) return [];
+  const ar = analysisReport;
+  const baseSections = [
+    { key: 'executive_summary', title: '执行摘要', icon: Sparkles, content: ar.executive_summary },
+    { key: 'case_background', title: '案例背景', icon: FileText, content: ar.case_background },
+    { key: 'four_layer_structure', title: '头-身-足-包四层结构', icon: Layers, content: ar.four_layer_structure },
+    { key: 'methodology_framework', title: '方法论框架', icon: Target, content: ar.methodology_framework },
+    { key: 'key_steps_analysis', title: '关键步骤详解', icon: CheckCircle, content: ar.key_steps_analysis },
+    { key: 'decision_logic_analysis', title: '决策逻辑深度分析', icon: Lightbulb, content: ar.decision_logic_analysis },
+    { key: 'process_obstacle_mapping', title: '流程-障碍映射', icon: Table, content: ar.process_obstacle_mapping },
+    { key: 'root_cause_analysis', title: '5Why根因链分析', icon: GitBranch, content: ar.root_cause_analysis },
+    { key: 'obstacles_and_risks', title: '风险与挑战分析', icon: AlertTriangle, content: ar.obstacles_and_risks },
+    { key: 'tools_and_scripts', title: '工具与话术清单', icon: Wrench, content: ar.tools_and_scripts },
+    { key: 'application_guidance', title: '应用建议', icon: Target, content: ar.application_guidance },
+    { key: 'critical_success_factors', title: '关键成功因素', icon: Star, content: ar.critical_success_factors },
+    { key: 'value_assessment', title: '价值评估', icon: BarChart3, content: ar.value_assessment },
+    { key: 'lessons_learned', title: '可迁移的经验教训', icon: Lightbulb, content: ar.lessons_learned },
+    { key: 'references', title: '相关概念与理论引用', icon: BookOpen, content: ar.references },
+    { key: 'three_review_assessment', title: '三审定稿评估', icon: CheckSquare, content: ar.three_review_assessment },
+  ];
+  return baseSections.filter((s) => typeof s.content === 'string' && s.content.trim().length > 0);
+};
+
 interface ReportPageProps {
   defaultView?: 'materials' | 'report';
 }
@@ -62,12 +88,18 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
   const [selectedDepth, setSelectedDepth] = useState('standard');
   const [showDepthDropdown, setShowDepthDropdown] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   // 顶部视图切换：访谈素材包（默认）vs 经验分析报告
   const [topView, setTopView] = useState<'materials' | 'report'>(defaultView);
   const [activeTab, setActiveTab] = useState('overview');
   const [showTabDropdown, setShowTabDropdown] = useState(false);
+
+  // 报告章节（用于 TOC 和滚动监听）
+  const reportSections = buildReportSections(report?.analysis_report);
+  const currentSection = useReportScrollSpy({
+    enabled: topView === 'report' && reportSections.length > 0,
+    sectionKeys: reportSections.map((s) => s.key),
+  });
 
   useEffect(() => {
     if (id) {
@@ -671,27 +703,7 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
   // ==================== 经验分析报告渲染逻辑 ====================
 
   const getReportSections = (): ReportSection[] => {
-    if (!report?.analysis_report) return [];
-    const ar = report.analysis_report;
-    const baseSections = [
-      { key: 'executive_summary', title: '执行摘要', icon: Sparkles, content: ar.executive_summary },
-      { key: 'case_background', title: '案例背景', icon: FileText, content: ar.case_background },
-      { key: 'four_layer_structure', title: '头-身-足-包四层结构', icon: Layers, content: ar.four_layer_structure },
-      { key: 'methodology_framework', title: '方法论框架', icon: Target, content: ar.methodology_framework },
-      { key: 'key_steps_analysis', title: '关键步骤详解', icon: CheckCircle, content: ar.key_steps_analysis },
-      { key: 'decision_logic_analysis', title: '决策逻辑深度分析', icon: Lightbulb, content: ar.decision_logic_analysis },
-      { key: 'process_obstacle_mapping', title: '流程-障碍映射', icon: Table, content: ar.process_obstacle_mapping },
-      { key: 'root_cause_analysis', title: '5Why根因链分析', icon: GitBranch, content: ar.root_cause_analysis },
-      { key: 'obstacles_and_risks', title: '风险与挑战分析', icon: AlertTriangle, content: ar.obstacles_and_risks },
-      { key: 'tools_and_scripts', title: '工具与话术清单', icon: Wrench, content: ar.tools_and_scripts },
-      { key: 'application_guidance', title: '应用建议', icon: Target, content: ar.application_guidance },
-      { key: 'critical_success_factors', title: '关键成功因素', icon: Star, content: ar.critical_success_factors },
-      { key: 'value_assessment', title: '价值评估', icon: BarChart3, content: ar.value_assessment },
-      { key: 'lessons_learned', title: '可迁移的经验教训', icon: Lightbulb, content: ar.lessons_learned },
-      { key: 'references', title: '相关概念与理论引用', icon: BookOpen, content: ar.references },
-      { key: 'three_review_assessment', title: '三审定稿评估', icon: CheckSquare, content: ar.three_review_assessment },
-    ];
-    return baseSections.filter((s) => typeof s.content === 'string' && s.content.trim().length > 0);
+    return buildReportSections(report?.analysis_report);
   };
 
   const renderMarkdownContent = (content: string) => {
@@ -860,36 +872,12 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
           </button>
         </div>
 
-        {/* 目录导航 */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">目录</h3>
-          <div className="flex flex-wrap gap-2">
-            {sections.map((section) => (
-              <button
-                key={section.key}
-                onClick={() => {
-                  setActiveSection(section.key);
-                  document.getElementById(`section-${section.key}`)?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
-                  activeSection === section.key
-                    ? 'bg-indigo-100 text-indigo-700'
-                    : 'bg-white text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <section.icon className="w-3.5 h-3.5" />
-                {section.title}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* 报告正文 */}
         <div className="space-y-8">
           {sections.map((section) => (
             <div
               key={section.key}
-              id={`section-${section.key}`}
+              id={section.key}
               className="scroll-mt-4"
             >
               <div className="flex items-center gap-2 mb-4">
@@ -1057,6 +1045,17 @@ export function ReportPage({ defaultView = 'report' }: ReportPageProps = {}) {
 
         {/* 视图内容 */}
         {topView === 'materials' ? renderMaterialsView() : renderReportView()}
+
+        {/* 右侧悬浮章节导航 */}
+        <ReportToc
+          sections={reportSections}
+          currentSection={currentSection}
+          onNavigate={(key) => {
+            document.getElementById(key)?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          colorScheme="indigo"
+          visible={topView === 'report' && reportSections.length > 0}
+        />
       </div>
     </div>
   );
