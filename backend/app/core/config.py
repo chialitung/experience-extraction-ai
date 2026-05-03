@@ -1,6 +1,10 @@
 from pydantic_settings import BaseSettings
+from pydantic import model_validator
 from typing import List, Optional
 import os
+
+
+_INSECURE_SECRETS = {"", "change-this-in-production", "your-secret-key-change-this-in-production"}
 
 
 class Settings(BaseSettings):
@@ -8,13 +12,13 @@ class Settings(BaseSettings):
     APP_NAME: str = "Experience Extraction AI"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    
+
     # Security
-    SECRET_KEY: str = "change-this-in-production"
+    SECRET_KEY: Optional[str] = None
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    
+
     # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/experience_extraction"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./dev.db"
     
     # Cache
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -70,7 +74,21 @@ class Settings(BaseSettings):
     @property
     def smtp_enabled(self) -> bool:
         return all([self.SMTP_HOST, self.SMTP_USERNAME, self.SMTP_PASSWORD, self.SMTP_FROM_EMAIL])
-    
+
+    @model_validator(mode="after")
+    def _validate_secrets(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            if not self.SECRET_KEY or self.SECRET_KEY in _INSECURE_SECRETS:
+                raise ValueError(
+                    "SECRET_KEY must be set in production. "
+                    "Generate via: openssl rand -hex 32"
+                )
+            if self.DATABASE_URL.startswith("sqlite"):
+                raise ValueError("DATABASE_URL must not be SQLite in production.")
+        if not self.SECRET_KEY:
+            self.SECRET_KEY = "dev-only-insecure-secret-do-not-use-in-prod"
+        return self
+
     class Config:
         env_file = ".env"
         case_sensitive = True
