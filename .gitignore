@@ -74,3 +74,4 @@ htmlcov/
 # Docker local overrides
 docker-compose.override.yml
 .env.docker
+CLAUDE.md
