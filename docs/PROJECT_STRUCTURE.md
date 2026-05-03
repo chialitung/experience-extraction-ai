@@ -1,39 +1,33 @@
----
-                    经验萃取AI系统 - 项目文件结构完整说明
----
+# 项目文件结构完整说明
 
-**项目根目录**:  experience-extraction-ai/
-**技术栈**:  FastAPI (后端) + React 18 + TypeScript + Vite (前端)
+**项目根目录**: experience-extraction-ai/
+**技术栈**: FastAPI (后端) + React 18 + TypeScript + Vite (前端)
 
 ---
-一、根目录文件 (Root Level Files)
----
 
+## 一、根目录文件 (Root Level Files)
+
+```text
 .gitignore                -- Git版本控制忽略规则文件，定义哪些文件/目录不被Git跟踪
-CLAUDE.md                 -- Claude Code AI助手项目指引文档，包含架构概述、常用命令等
 README.md                 -- 项目总览说明文档，包含快速开始指南、API接口说明
-SMPT_HELP.md              -- SMTP邮件服务配置帮助文档
 manage.cmd                -- Windows批处理入口，调用PowerShell脚本管理项目进程
 manage.ps1                -- 项目进程管理PowerShell脚本：一键启动/停止/重启/查看状态前后端服务
+```
 
+```text
 【根目录 -- 临时/日志/测试文件（运行生成，非版本控制核心）】
 backend_err.log           -- 后端错误输出日志
 backend_out.log           -- 后端标准输出日志
 frontend_err.log          -- 前端错误输出日志
 frontend_out.log          -- 前端标准输出日志
-e2e_test.js               -- E2E测试辅助脚本
 test_api_flow.log         -- API流程测试日志
-test_api_flow.py          -- API流程测试脚本
-test_simple.py            -- 简单功能测试脚本
-jieba_pos_test.txt        -- jieba分词词性标注测试数据
-jieba_test.txt            -- jieba分词功能测试数据
-经验分析报告完整指南：从萃取到落地传承的全流程方法论.pdf
-                          -- 业务方法论参考文档（PDF）
+```
 
 ---
-二、后端目录 (backend/)
----
 
+## 二、后端目录 (backend/)
+
+```text
 backend/
 │
 ├── main.py               -- FastAPI应用主入口。注册路由、中间件（CORS/限流/请求日志）、
@@ -173,11 +167,13 @@ backend/
         │   ├── topic_drift_arbitration_system.md -- 主题偏离灰区仲裁-系统提示词
         │   └── topic_drift_arbitration_user.md   -- 主题偏离灰区仲裁-用户提示词
         └── quality/          -- 质量保障提示词（预留目录）
+```
 
 ---
-三、前端目录 (frontend/)
----
 
+## 三、前端目录 (frontend/)
+
+```text
 frontend/
 │
 ├── index.html            -- Vite应用HTML入口模板
@@ -210,18 +206,6 @@ frontend/
 │   ├── interview-fallback.spec.ts          -- 兜底规则E2E测试（8轮对话完整流程）
 │   ├── interview-voice-simulation.spec.ts  -- 语音输入模拟E2E测试（完整访谈+语音+录屏）
 │   └── screenshots/      -- E2E测试过程中自动截取的屏幕截图（调试用）
-│
-├── e2e_test.cjs          -- E2E测试辅助CommonJS脚本
-├── e2e_test_report.md    -- E2E测试报告文档
-├── e2e_screenshots/      -- E2E测试手动截图（36张，记录完整访谈流程各阶段状态）
-│
-├── test-results/         -- Playwright测试结果目录
-│   ├── .last-run.json    -- 最后一次测试运行状态
-│   ├── e2e-demo.mp4      -- E2E演示录屏
-│   └── interview-voice-simulation-*/video.webm  -- 语音模拟测试录屏视频
-│
-├── playwright-report/    -- Playwright HTML测试报告
-│   └── index.html        -- 可视化测试报告页面
 │
 【源代码 -- src/】
 └── src/
@@ -307,11 +291,13 @@ frontend/
         │                         满足百度语音识别API格式要求
         └── logger.ts           -- 前端日志工具。开发环境控制台日志、
                                   日志级别控制、结构化日志输出
+```
 
 ---
-四、E2E测试目录 (e2e/) -- 根级Python E2E测试
----
 
+## 四、E2E测试目录 (e2e/) -- 根级Python E2E测试
+
+```text
 e2e/
 ├── test_fallback_rules.py            -- Python编写的E2E兜底规则测试。
 │                                       直接调用后端API验证8轮对话完整流程、
@@ -321,40 +307,56 @@ e2e/
     ├── Snipaste_2026-05-02_22-02-23.png
     ├── ab_01_form_filled.png ~ ab_06_turn3.png    -- 兜底规则测试各阶段截图
     └── py_01_homepage.png ~ py_error_60min.png    -- Python E2E测试各阶段截图
+```
 
 ---
-五、文档/AI配置目录 (docs/)
----
 
+## 五、文档/AI配置目录 (docs/)
+
+```text
 docs/
-└── superpowers/              -- Claude Code Superpowers技能配置
-    ├── plans/                -- 计划模板目录（预留）
-    └── specs/                -- 规格说明目录（预留）
+├── deployment/
+│   ├── docker.md           -- Docker Compose 部署详细指南
+│   ├── manual.md           -- 手动部署指南（不通过 Docker）
+│   └── smtp.md             -- SMTP 邮件发送配置指南
+├── development/
+│   └── setup.md            -- 开发环境设置（热更新、测试运行）
+├── PROJECT_STRUCTURE.md    -- 本文档：项目文件结构完整说明
+├── test_plan_topic_drift_llm.md  -- LLM语义版主题偏离检测测试计划
+└── superpowers/            -- Claude Code Superpowers技能配置
+    ├── plans/              -- 计划模板目录（预留）
+    └── specs/              -- 规格说明目录（预留）
+```
 
 ---
-六、隐藏/配置目录
----
 
+## 六、隐藏/配置目录
+
+```text
 .claude/                      -- Claude Code会话数据目录（AI助手持久化配置）
 .git/                         -- Git版本控制仓库数据
 .logs/                        -- manage.ps1统一管理的服务日志目录
+```
 
 ---
-七、被排除未列出的目录说明
----
 
+## 七、被排除未列出的目录说明
+
+```text
 backend/venv/                 -- Python虚拟环境（第三方依赖，由pip安装生成）
 frontend/node_modules/        -- Node.js依赖包（由npm install生成）
 backend/app/**/__pycache__/   -- Python字节码缓存（运行时自动生成）
 **/.pytest_cache/            -- pytest测试缓存
 frontend/dist/                -- 前端生产构建产物（由vite build生成）
+```
 
 以上目录均为自动生成或第三方内容，不属于项目源代码，故不在本说明中展开。
 
 ---
-八、核心数据流与文件协作关系
----
 
+## 八、核心数据流与文件协作关系
+
+```text
 1. 访谈创建流程:
    InterviewCreatePage.tsx -> api.ts -> interviews.py -> interview_service.py
    -> interview.py(模型) -> database.py -> SQLite/PostgreSQL
@@ -376,7 +378,8 @@ frontend/dist/                -- 前端生产构建产物（由vite build生成�
 5. 成果导出流程:
    OutputPage.tsx -> api.ts -> interviews.py -> export_service.py
    -> template_service.py(模板渲染) -> python-docx/weasyprint(文档生成)
+```
 
 ---
-                              文档生成时间: 2026-05-03
----
+
+**文档生成时间**: 2026-05-03
