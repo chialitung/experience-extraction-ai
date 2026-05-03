@@ -44,6 +44,12 @@ logs/
 # Test artifacts
 e2e_screenshots/
 test_screenshots/
+test-results/
+playwright-report/
+test_result*.txt
+
+# Claude personal settings (machine-specific allow-list, not for sharing)
+.claude/settings.local.json
 
 # Coverage
 .coverage
