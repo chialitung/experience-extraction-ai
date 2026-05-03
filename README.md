@@ -18,6 +18,8 @@ AI 驱动的经验萃取访谈辅助系统，帮助组织将业务专家的隐�
 
 <img src="screenshot&reportsample\Snipaste_2026-05-03_18-26-05.png" alt="页面截图" width="800">
 
+<img src="screenshot&reportsample\Snipaste_2026-05-03_18-31-50.png" alt="页面截图" width="800">
+
 <img src="screenshot&reportsample\Snipaste_2026-05-03_18-35-28.png" alt="页面截图" width="800">
 
 ## 🚀 Quick Start (Docker)
