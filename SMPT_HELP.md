@@ -1,57 +1,85 @@
-什么是 POP3/IMAP/SMTP 服务
-POP3 （Post Office Protocol - Version 3）协议用于支持使用电子邮件客户端获取并删除在服务器上的电子邮件。
+# SMTP 邮件发送配置指南
 
-IMAP （Internet Message Access Protocol）协议用于支持使用电子邮件客户端交互式存取服务器上的邮件。
+本项目使用 SMTP 协议发送密码找回等系统邮件。代码层（`app/services/email_service.py`）基于 Python 标准库 `smtplib`，**不绑定任何邮件服务商**——只要服务商支持 SMTP，把 `.env` 中的 5 个变量填好即可使用。
 
-SMTP （Simple Mail Transfer Protocol）协议用于支持使用电子邮件客户端发送电子邮件。
+## 必填环境变量
 
+| 变量 | 说明 |
+| --- | --- |
+| `SMTP_HOST` | SMTP 服务器域名，如 `smtp.qq.com`、`smtp.gmail.com` |
+| `SMTP_PORT` | 端口；465 配 SSL、587 配 STARTTLS |
+| `SMTP_SSL` | `true` = 端口 465 隐式 SSL；`false` = 端口 587 STARTTLS |
+| `SMTP_USERNAME` | 登录账号，通常是你的完整邮箱地址 |
+| `SMTP_PASSWORD` | **不是邮箱登录密码**，是服务商发的「授权码 / 应用专用密码」（见下） |
+| `SMTP_FROM_EMAIL` | 发件人地址，通常等于 `SMTP_USERNAME` |
 
-IMAP 和 POP 有什么区别
-POP允许电子邮件客户端下载服务器上的邮件，但是你在电子邮件客户端上的操作（如：移动邮件、标记已读等）不会反馈到服务器上的，比如：你通过电子邮件客户端收取了QQ邮箱中的3封邮件并移动到了其他文件夹，这些移动动作是不会反馈到服务器上的，也就是说，QQ邮箱服务器上的这些邮件是没有同时被移动的。需要特别注意的是，第三方客户端通过POP收取邮件时，也是有可能同步删除服务端邮件。在第三方客户端设置 POP 时，请留意是否有 保留邮件副本/备份 相关选项。如有该选项，且要保留服务器上的邮件，请勾选该选项。
+## 常见服务商预设
 
+### QQ / Foxmail
 
-在IMAP协议上，电子邮件客户端的操作都会反馈到服务器上，你对邮件进行的操作（如：移动邮件、标记已读、删除邮件等）服务器上的邮件也会做相应的动作。也就是说，IMAP 是“双向”的。同时，IMAP 可以只下载邮件的主题，只有当你真正需要的时候，才会下载邮件的所有内容。在 POP3 和 IMAP 协议上，QQ邮箱推荐你使用IMAP协议来存取服务器上的邮件。
+```env
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_SSL=true
+```
 
+获取授权码：登录 QQ 邮箱 → 设置 → 账户 → 开启「POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV 服务」→ 生成 16 位授权码。该授权码用作 `SMTP_PASSWORD`，**不能填 QQ 登录密码**。
 
-什么是授权码
-授权码是QQ邮箱用于登录第三方客户端/服务的专用密码，适用于登录以下服务：POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV 服务。
+### 163 / 网易邮箱
 
-温馨提醒：为了你的帐户安全，请不要告诉他人你的授权码，更改QQ帐号密码会触发授权码过期，需要重新获取新的授权码登录。
+```env
+SMTP_HOST=smtp.163.com
+SMTP_PORT=465
+SMTP_SSL=true
+```
 
+获取客户端授权密码：登录 163 邮箱 → 设置 → POP3/SMTP/IMAP → 开启 SMTP 服务 → 获取授权密码。
 
-在第三方客户端/服务怎么设置
-登录时，请在第三方客户端的密码输入框里面填入授权码进行验证。（不是填入QQ的密码）
+### Gmail
 
-IMAP/SMTP 设置方法
-用户名/帐户： 你的QQ邮箱完整的地址
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SSL=false
+```
 
-密码： 生成的授权码
+需先开启「两步验证」，再到 Google 账号 → 安全 → 应用专用密码 生成 16 位密码作为 `SMTP_PASSWORD`。
 
-电子邮件地址： 你的QQ邮箱的完整邮件地址
+### Outlook / Hotmail / Office 365
 
-接收邮件服务器： imap.qq.com，使用SSL，端口号993
+```env
+SMTP_HOST=smtp.office365.com
+SMTP_PORT=587
+SMTP_SSL=false
+```
 
-发送邮件服务器： smtp.qq.com，使用SSL，端口号465或587
+普通账号可直接使用邮箱密码；启用了 MFA 的账号需在账户设置中生成应用专用密码。
 
+### 自建 / 企业 SMTP
 
-POP3/SMTP 设置方法
-用户名/帐户： 你的QQ邮箱完整的地址
+按运维或 IT 部门提供的 `host` / `port` / 加密方式填写：
+- 端口 465 → `SMTP_SSL=true`
+- 端口 587（或 25）→ `SMTP_SSL=false`，代码自动走 `STARTTLS`
 
-密码： 生成的授权码
+## 验证配置
 
-电子邮件地址： 你的QQ邮箱的完整邮件地址
+```bash
+cd backend && python -c "from app.core.config import settings; print('smtp_enabled =', settings.smtp_enabled)"
+```
 
-接收邮件服务器： pop.qq.com，使用SSL，端口号995
+`smtp_enabled` 为 `True` 表示 4 个关键变量都已填写（HOST / USERNAME / PASSWORD / FROM_EMAIL）。然后在前端触发「忘记密码」流程，观察 `backend/logs/` 下日志里是否有 `邮件发送成功`。
 
-发送邮件服务器： smtp.qq.com，使用SSL，端口号465或587
+## 常见报错
 
+| 报错 | 原因 |
+| --- | --- |
+| `SMTPAuthenticationError` | 多半是 `SMTP_PASSWORD` 用了登录密码而非授权码；或 IP 触发了风控被拒登录。 |
+| `Connection unexpectedly closed` | 端口/SSL 不匹配——465 必须 `SMTP_SSL=true`，587 必须 `false`。 |
+| `Sender address rejected` | `SMTP_FROM_EMAIL` 与 `SMTP_USERNAME` 不一致，或服务商不允许该发件人。 |
+| 邮件发出但收件方收不到 | 落入垃圾邮件，或服务商对 PaaS/家宽 IP 限流。换信誉好的服务商或加 SPF/DKIM。 |
 
-怎么管理我的授权码
-在网页QQ邮箱端管理
+## 安全提示
 
-在邮箱帐号与安全点击 设备管理 > 授权码管理，对授权码进行管理。
-
-
-在QQ邮箱APP端管理
-
-在QQ邮箱App点击左上角头像 > 在我的帐户列表下点击帐号>安全管理>设备管理，对授权码进行管理。
+- `SMTP_PASSWORD` 等同登录凭证，**不要提交到 git**。`.env` 已写入 `.gitignore`。
+- 若曾误提交，立即在邮箱后台**作废旧授权码**并重新生成。
+- 生产环境建议使用专用发件账号，不要复用个人邮箱。

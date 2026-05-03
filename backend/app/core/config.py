@@ -49,11 +49,11 @@ class Settings(BaseSettings):
     MOCK_TRANSCRIPTION: bool = False
 
     # Email (SMTP)
-    SMTP_HOST: Optional[str] = "smtp.qq.com"
+    SMTP_HOST: Optional[str] = None
     SMTP_PORT: int = 465
-    SMTP_USERNAME: Optional[str] = "160534520@qq.com"
-    SMTP_PASSWORD: Optional[str] = "tpalkvqaszqnbhje"
-    SMTP_FROM_EMAIL: Optional[str] = "160534520@qq.com"
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: Optional[str] = None
     SMTP_SSL: bool = True
     FRONTEND_BASE_URL: str = "http://localhost:5173"
 
