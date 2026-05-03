@@ -16,8 +16,8 @@ AI 驱动的经验萃取访谈辅助系统，帮助组织将业务专家的隐�
 - **语音输入支持**：集成百度语音识别 WebSocket 实时转写
 - **可选 JWT 认证**：无 token 时开放访问（演示模式），有 token 时强制鉴权
 
-![图片描述](screenshot&reportsample\Snipaste_2026-05-03_18-26-05.png)
-![图片描述](screenshot&reportsample\Snipaste_2026-05-03_18-35-28.png)
+<img src="screenshot&reportsample\Snipaste_2026-05-03_18-26-05.png" alt="页面截图" width="600">
+<img src="screenshot&reportsample\Snipaste_2026-05-03_18-35-28.png" alt="页面截图" width="600">
 
 ## 🚀 Quick Start (Docker)
 
