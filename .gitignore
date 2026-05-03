@@ -54,3 +54,23 @@ test_result*.txt
 # Coverage
 .coverage
 htmlcov/
+
+# Python tool caches
+.mypy_cache/
+.ruff_cache/
+.tox/
+.eggs/
+*.egg
+
+# Vite cache
+.vite/
+
+# Temporary files
+*.bak
+*.tmp
+*.orig
+*~
+
+# Docker local overrides
+docker-compose.override.yml
+.env.docker
